@@ -19,4 +19,5 @@ export type AvailabilitySlot = {
   bookedConsoleIds: ConsoleId[];
   availableConsoleIds: ConsoleId[];
   tvCapacityRemaining: number;
+  isPast?: boolean;
 };

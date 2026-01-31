@@ -6,6 +6,7 @@ import {
   TV_COUNT,
   type ConsoleId,
   isDateAllowed,
+  isSlotPast,
 } from "@/lib/config";
 
 export async function GET(req: Request) {
@@ -38,9 +39,12 @@ export async function GET(req: Request) {
 
   const allIds = CONSOLES.map((c) => c.id);
   const slots = SLOTS.map((slot) => {
+    // Check if slot is in the past for today
+    const isPast = isSlotPast(date, slot);
+
     const booked = Array.from(bySlot.get(slot) ?? new Set<ConsoleId>());
     const bookedCount = booked.length;
-    const tvRemaining = Math.max(0, TV_COUNT - bookedCount);
+    const tvRemaining = isPast ? 0 : Math.max(0, TV_COUNT - bookedCount);
 
     const available =
       tvRemaining <= 0
@@ -52,6 +56,7 @@ export async function GET(req: Request) {
       bookedConsoleIds: booked,
       availableConsoleIds: available,
       tvCapacityRemaining: tvRemaining,
+      isPast, // Include this for frontend awareness
     };
   });
 

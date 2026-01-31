@@ -9,6 +9,16 @@ type Props = {
   onChange: (date: string) => void;
 };
 
+function formatDateLabel(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+
 export default function DateTabs({ value, onChange }: Props) {
   const today = todayYmd(0);
   const d1 = todayYmd(1);
@@ -23,9 +33,9 @@ export default function DateTabs({ value, onChange }: Props) {
         onChange={(_, newIdx: number) => onChange([today, d1, d2][newIdx])}
         variant="fullWidth"
       >
-        <Tab label="Today" />
-        <Tab label="Tomorrow" />
-        <Tab label="Day after" />
+        <Tab label={formatDateLabel(today)} />
+        <Tab label={formatDateLabel(d1)} />
+        <Tab label={formatDateLabel(d2)} />
       </Tabs>
     </Paper>
   );

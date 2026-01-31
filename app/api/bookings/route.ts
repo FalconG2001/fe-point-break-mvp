@@ -5,6 +5,7 @@ import {
   TV_COUNT,
   type ConsoleId,
   isDateAllowed,
+  isSlotPast,
 } from "@/lib/config";
 import { CreateBookingSchema } from "@/lib/validators";
 
@@ -22,6 +23,14 @@ export async function POST(req: Request) {
 
   if (!isDateAllowed(date)) {
     return NextResponse.json({ error: "Date not allowed" }, { status: 400 });
+  }
+
+  // Prevent booking past slots for today
+  if (isSlotPast(date, slot)) {
+    return NextResponse.json(
+      { error: "This time slot has already passed" },
+      { status: 400 },
+    );
   }
 
   const requestedConsoleIds = selections.map((s) => s.consoleId as ConsoleId);

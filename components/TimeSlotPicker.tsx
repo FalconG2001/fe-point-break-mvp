@@ -36,7 +36,13 @@ export default function TimeSlotPicker({ slots, value, onChange }: Props) {
                 <span>{s.slot}</span>
                 <Chip
                   size="small"
-                  label={disabled ? "Full" : `${s.tvCapacityRemaining} TV left`}
+                  label={
+                    s.isPast
+                      ? "Passed"
+                      : disabled
+                        ? "Full"
+                        : `${s.tvCapacityRemaining} TV left`
+                  }
                   sx={{ ml: 1 }}
                 />
               </Button>
