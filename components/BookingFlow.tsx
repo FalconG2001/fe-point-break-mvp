@@ -20,7 +20,12 @@ import TimeSlotPicker from "./TimeSlotPicker";
 import ConsoleSelector, { type SelectionState } from "./ConsoleSelector";
 import BookingDialog from "./BookingDialog";
 
-import { todayYmd, type ConsoleId, CONSOLES } from "@/lib/config";
+import {
+  todayYmd,
+  type ConsoleId,
+  CONSOLES,
+  type DurationMinutes,
+} from "@/lib/config";
 import type { AvailabilitySlot } from "@/types";
 
 type AvailabilityResponse = {
@@ -79,10 +84,15 @@ export default function BookingFlow() {
   }, [availability, slot]);
 
   const selectedConsoles = React.useMemo(() => {
-    const arr: Array<{ consoleId: ConsoleId; players: number }> = [];
+    const arr: Array<{
+      consoleId: ConsoleId;
+      players: number;
+      duration: DurationMinutes;
+    }> = [];
     for (const c of CONSOLES) {
       const v = selection[c.id];
-      if (v?.selected) arr.push({ consoleId: c.id, players: v.players });
+      if (v?.selected)
+        arr.push({ consoleId: c.id, players: v.players, duration: v.duration });
     }
     return arr;
   }, [selection]);

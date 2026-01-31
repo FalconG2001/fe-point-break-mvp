@@ -4,6 +4,7 @@ import {
   MAX_PLAYERS,
   MIN_PLAYERS,
   SLOTS,
+  DURATION_OPTIONS,
   isDateAllowed,
 } from "./config";
 
@@ -11,9 +12,16 @@ export const ConsoleIdSchema = z.enum(
   CONSOLES.map((c) => c.id) as [string, ...string[]],
 );
 
+export const DurationSchema = z
+  .enum(DURATION_OPTIONS.map(String) as [string, ...string[]])
+  .transform(Number);
+
 export const BookingSelectionSchema = z.object({
   consoleId: ConsoleIdSchema,
   players: z.number().int().min(MIN_PLAYERS).max(MAX_PLAYERS),
+  duration: z
+    .number()
+    .refine((v) => DURATION_OPTIONS.includes(v as any), "Invalid duration"),
 });
 
 export const CreateBookingSchema = z.object({

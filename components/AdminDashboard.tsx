@@ -15,17 +15,29 @@ import {
   Chip,
   Button,
   Divider,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
+import CancelIcon from "@mui/icons-material/Cancel";
+import RestoreIcon from "@mui/icons-material/Restore";
 import { signOut } from "next-auth/react";
 import DateTabs from "./DateTabs";
 import { todayYmd, CONSOLES } from "@/lib/config";
+
+type SelectionWithDuration = {
+  consoleId: string;
+  players: number;
+  duration: number;
+  durationLabel: string;
+};
 
 type AdminBooking = {
   id: string;
   date: string;
   slot: string;
-  selections: Array<{ consoleId: string; players: number }>;
+  selections: SelectionWithDuration[];
   customer: { name: string; phone: string };
+  confirmed: boolean;
   createdAt: string;
 };
 
@@ -42,6 +54,7 @@ export default function AdminDashboard() {
   const [date, setDate] = React.useState(todayYmd(0));
   const [data, setData] = React.useState<ApiResp | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [actionLoading, setActionLoading] = React.useState<string | null>(null);
 
   async function load(d: string) {
     setLoading(true);
@@ -67,6 +80,27 @@ export default function AdminDashboard() {
     }
   }
 
+  async function toggleConfirmed(bookingId: string, newConfirmed: boolean) {
+    setActionLoading(bookingId);
+    try {
+      const res = await fetch("/api/admin/bookings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId, confirmed: newConfirmed }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || "Failed to update booking");
+      }
+      // Reload data
+      await load(date);
+    } catch (e: any) {
+      alert(e?.message || "Failed to update");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
   React.useEffect(() => {
     load(date);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -76,7 +110,7 @@ export default function AdminDashboard() {
     CONSOLES.find((c) => c.id === id)?.short ?? id;
 
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 2, sm: 4 } }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 4 } }}>
       <Stack spacing={2}>
         <Stack
           direction="row"
@@ -107,7 +141,10 @@ export default function AdminDashboard() {
           {!loading && data && !data.error && (
             <Stack spacing={2}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                <Chip label={`Bookings: ${data.totalBookings}`} />
+                <Chip
+                  label={`Active Bookings: ${data.totalBookings}`}
+                  color="primary"
+                />
                 <Chip label={`Consoles booked: ${data.totalConsolesBooked}`} />
                 <Chip label={`Players: ${data.totalPlayers}`} />
               </Stack>
@@ -120,28 +157,72 @@ export default function AdminDashboard() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
+                      <TableCell>Status</TableCell>
                       <TableCell>Time</TableCell>
                       <TableCell>Booked by</TableCell>
                       <TableCell>Phone</TableCell>
-                      <TableCell>Consoles</TableCell>
+                      <TableCell>Consoles & Duration</TableCell>
                       <TableCell align="right">Players</TableCell>
+                      <TableCell align="center">Actions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {data.bookings.map((b) => (
-                      <TableRow key={b.id}>
+                      <TableRow
+                        key={b.id}
+                        sx={{
+                          opacity: b.confirmed ? 1 : 0.5,
+                          backgroundColor: b.confirmed
+                            ? "inherit"
+                            : "action.hover",
+                        }}
+                      >
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            label={b.confirmed ? "Active" : "Cancelled"}
+                            color={b.confirmed ? "success" : "error"}
+                          />
+                        </TableCell>
                         <TableCell>{b.slot}</TableCell>
                         <TableCell>{b.customer?.name ?? ""}</TableCell>
                         <TableCell>{b.customer?.phone ?? ""}</TableCell>
                         <TableCell>
-                          {b.selections
-                            .map((s) => `${consoleName(s.consoleId)}`)
-                            .join(", ")}
+                          {b.selections.map((s, idx) => (
+                            <div key={idx}>
+                              {consoleName(s.consoleId)} ({s.durationLabel})
+                            </div>
+                          ))}
                         </TableCell>
                         <TableCell align="right">
                           {b.selections.reduce(
                             (sum, s) => sum + (s.players ?? 0),
                             0,
+                          )}
+                        </TableCell>
+                        <TableCell align="center">
+                          {b.confirmed ? (
+                            <Tooltip title="Cancel booking">
+                              <IconButton
+                                color="error"
+                                size="small"
+                                onClick={() => toggleConfirmed(b.id, false)}
+                                disabled={actionLoading === b.id}
+                              >
+                                <CancelIcon />
+                              </IconButton>
+                            </Tooltip>
+                          ) : (
+                            <Tooltip title="Restore booking">
+                              <IconButton
+                                color="success"
+                                size="small"
+                                onClick={() => toggleConfirmed(b.id, true)}
+                                disabled={actionLoading === b.id}
+                              >
+                                <RestoreIcon />
+                              </IconButton>
+                            </Tooltip>
                           )}
                         </TableCell>
                       </TableRow>

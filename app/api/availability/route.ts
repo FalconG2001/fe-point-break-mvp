@@ -7,6 +7,7 @@ import {
   type ConsoleId,
   isDateAllowed,
   isSlotPast,
+  getSlotsForDuration,
 } from "@/lib/config";
 
 export async function GET(req: Request) {
@@ -17,24 +18,34 @@ export async function GET(req: Request) {
   }
 
   const db = await getDb();
+  // Only fetch confirmed bookings (not cancelled)
   const bookings = await db
     .collection("bookings")
-    .find({ date })
+    .find({ date, confirmed: { $ne: false } })
     .project({ _id: 0, slot: 1, selections: 1 })
     .toArray();
 
+  // Build a map: slot -> Set of console IDs booked for that slot
+  // Each booking may cover multiple slots based on duration
   const bySlot = new Map<string, Set<ConsoleId>>();
-  const countBySlot = new Map<string, number>();
 
   for (const b of bookings) {
-    const slot: string = b.slot;
-    const set = bySlot.get(slot) ?? new Set<ConsoleId>();
+    const startSlot: string = b.slot;
     const sel = Array.isArray(b.selections) ? b.selections : [];
+
     for (const s of sel) {
-      if (s?.consoleId) set.add(s.consoleId as ConsoleId);
+      if (!s?.consoleId) continue;
+      const consoleId = s.consoleId as ConsoleId;
+      const duration = s.duration || 60; // Default 60 min for legacy bookings
+
+      // Get all slots this console occupies
+      const coveredSlots = getSlotsForDuration(startSlot, duration);
+      for (const coveredSlot of coveredSlots) {
+        const set = bySlot.get(coveredSlot) ?? new Set<ConsoleId>();
+        set.add(consoleId);
+        bySlot.set(coveredSlot, set);
+      }
     }
-    bySlot.set(slot, set);
-    countBySlot.set(slot, (countBySlot.get(slot) ?? 0) + set.size);
   }
 
   const allIds = CONSOLES.map((c) => c.id);
@@ -56,7 +67,7 @@ export async function GET(req: Request) {
       bookedConsoleIds: booked,
       availableConsoleIds: available,
       tvCapacityRemaining: tvRemaining,
-      isPast, // Include this for frontend awareness
+      isPast,
     };
   });
 

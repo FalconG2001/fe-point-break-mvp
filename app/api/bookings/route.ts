@@ -2,10 +2,12 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import {
   CONSOLES,
+  SLOTS,
   TV_COUNT,
   type ConsoleId,
   isDateAllowed,
   isSlotPast,
+  getSlotsForDuration,
 } from "@/lib/config";
 import { CreateBookingSchema } from "@/lib/validators";
 
@@ -42,48 +44,107 @@ export async function POST(req: Request) {
     );
   }
 
-  const db = await getDb();
-  const existing = await db
-    .collection("bookings")
-    .find({ date, slot })
-    .project({ _id: 0, selections: 1 })
-    .toArray();
-
-  const booked = new Set<ConsoleId>();
-  for (const b of existing) {
-    for (const s of b.selections ?? []) {
-      if (s?.consoleId) booked.add(s.consoleId as ConsoleId);
+  // Basic sanity: console must exist
+  const allConsoles = new Set(CONSOLES.map((c) => c.id));
+  for (const id of requestedConsoleIds) {
+    if (!allConsoles.has(id)) {
+      return NextResponse.json({ error: "Unknown console" }, { status: 400 });
     }
   }
 
-  // Rule 1: no double-booking the same console
-  for (const id of requestedConsoleIds) {
-    if (booked.has(id)) {
+  // Check that booking doesn't exceed slot boundaries
+  for (const sel of selections) {
+    const coveredSlots = getSlotsForDuration(slot, sel.duration);
+    if (coveredSlots.length === 0) {
+      return NextResponse.json({ error: "Invalid slot" }, { status: 400 });
+    }
+    // Check if duration extends beyond closing time
+    const expectedSlotCount = Math.ceil(sel.duration / 15);
+    if (coveredSlots.length < expectedSlotCount) {
       return NextResponse.json(
-        { error: `Console already booked for ${slot}`, consoleId: id },
-        { status: 409 },
+        { error: `Duration extends beyond closing time for ${sel.consoleId}` },
+        { status: 400 },
       );
     }
+    // Check if any covered slot is in the past
+    for (const coveredSlot of coveredSlots) {
+      if (isSlotPast(date, coveredSlot)) {
+        return NextResponse.json(
+          { error: `Time slot ${coveredSlot} has already passed` },
+          { status: 400 },
+        );
+      }
+    }
   }
 
-  // Rule 2: TV capacity (max 3 consoles at once)
-  const totalAfter = booked.size + requestedConsoleIds.length;
-  if (totalAfter > TV_COUNT) {
-    return NextResponse.json(
-      {
-        error: "No TV capacity left for this slot",
-        tvCapacity: TV_COUNT,
-        alreadyBookedCount: booked.size,
-      },
-      { status: 409 },
-    );
+  const db = await getDb();
+
+  // Get all confirmed bookings for this date
+  const existingBookings = await db
+    .collection("bookings")
+    .find({ date, confirmed: { $ne: false } })
+    .project({ _id: 0, slot: 1, selections: 1 })
+    .toArray();
+
+  // Build a map: slot -> Set of console IDs already booked
+  const bookedBySlot = new Map<string, Set<ConsoleId>>();
+  for (const b of existingBookings) {
+    const startSlot: string = b.slot;
+    const sel = Array.isArray(b.selections) ? b.selections : [];
+    for (const s of sel) {
+      if (!s?.consoleId) continue;
+      const consoleId = s.consoleId as ConsoleId;
+      const duration = s.duration || 60;
+      const coveredSlots = getSlotsForDuration(startSlot, duration);
+      for (const coveredSlot of coveredSlots) {
+        const set = bookedBySlot.get(coveredSlot) ?? new Set<ConsoleId>();
+        set.add(consoleId);
+        bookedBySlot.set(coveredSlot, set);
+      }
+    }
   }
 
-  // Basic sanity: console must exist
-  const all = new Set(CONSOLES.map((c) => c.id));
-  for (const id of requestedConsoleIds) {
-    if (!all.has(id)) {
-      return NextResponse.json({ error: "Unknown console" }, { status: 400 });
+  // Check conflicts for each requested console
+  for (const sel of selections) {
+    const consoleId = sel.consoleId as ConsoleId;
+    const coveredSlots = getSlotsForDuration(slot, sel.duration);
+
+    for (const coveredSlot of coveredSlots) {
+      const bookedInSlot =
+        bookedBySlot.get(coveredSlot) ?? new Set<ConsoleId>();
+
+      // Rule 1: no double-booking the same console
+      if (bookedInSlot.has(consoleId)) {
+        return NextResponse.json(
+          {
+            error: `${consoleId} is already booked for ${coveredSlot}`,
+            consoleId,
+            conflictSlot: coveredSlot,
+          },
+          { status: 409 },
+        );
+      }
+
+      // Rule 2: TV capacity (max 3 consoles at once)
+      // Count how many consoles would be active in this slot after adding new ones
+      const currentCount = bookedInSlot.size;
+      // Count how many of the requested consoles affect this slot
+      const newConsolesInSlot = selections.filter((s) => {
+        const slots = getSlotsForDuration(slot, s.duration);
+        return slots.includes(coveredSlot);
+      }).length;
+      const totalAfter = currentCount + newConsolesInSlot;
+
+      if (totalAfter > TV_COUNT) {
+        return NextResponse.json(
+          {
+            error: `No TV capacity left for slot ${coveredSlot}`,
+            tvCapacity: TV_COUNT,
+            alreadyBookedCount: currentCount,
+          },
+          { status: 409 },
+        );
+      }
     }
   }
 
@@ -92,6 +153,7 @@ export async function POST(req: Request) {
     slot,
     selections,
     customer: { name, phone },
+    confirmed: true, // New bookings are confirmed by default
     createdAt: new Date().toISOString(),
   };
 

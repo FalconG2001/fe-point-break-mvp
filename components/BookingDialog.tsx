@@ -12,8 +12,8 @@ import {
   Alert,
   Typography,
 } from "@mui/material";
-import type { ConsoleId } from "@/lib/config";
-import { CONSOLES } from "@/lib/config";
+import type { ConsoleId, DurationMinutes } from "@/lib/config";
+import { CONSOLES, DURATION_LABELS } from "@/lib/config";
 
 type Props = {
   open: boolean;
@@ -24,7 +24,11 @@ type Props = {
   summary: {
     date: string;
     slot: string;
-    selections: Array<{ consoleId: ConsoleId; players: number }>;
+    selections: Array<{
+      consoleId: ConsoleId;
+      players: number;
+      duration: DurationMinutes;
+    }>;
   };
 };
 
@@ -60,7 +64,7 @@ export default function BookingDialog({
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            {summary.date} • {summary.slot}
+            {summary.date} • Starting at {summary.slot}
           </Typography>
           <Stack spacing={0.5}>
             {summary.selections.map((s) => (
@@ -68,7 +72,7 @@ export default function BookingDialog({
                 •{" "}
                 {CONSOLES.find((c) => c.id === s.consoleId)?.name ??
                   s.consoleId}{" "}
-                — {s.players} players
+                — {s.players} players, {DURATION_LABELS[s.duration]}
               </Typography>
             ))}
           </Stack>

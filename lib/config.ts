@@ -45,6 +45,39 @@ export const CLOSE_HOUR = 22; // 22:00 (last slot starts at 21:45)
 export const MIN_PLAYERS = 1;
 export const MAX_PLAYERS = 6;
 
+// Duration options (in minutes)
+export const DURATION_OPTIONS = [30, 60, 90, 120, 150, 180] as const;
+export type DurationMinutes = (typeof DURATION_OPTIONS)[number];
+
+export const DURATION_LABELS: Record<DurationMinutes, string> = {
+  30: "30 mins",
+  60: "1 hour",
+  90: "1.5 hours",
+  120: "2 hours",
+  150: "2.5 hours",
+  180: "3 hours",
+};
+
+/**
+ * Calculate how many 15-min slots a duration occupies
+ */
+export function durationToSlotCount(durationMinutes: number): number {
+  return Math.ceil(durationMinutes / SLOT_LENGTH_MINUTES);
+}
+
+/**
+ * Get all slot times that a booking covers based on start slot and duration
+ */
+export function getSlotsForDuration(
+  startSlot: string,
+  durationMinutes: number,
+): string[] {
+  const startIdx = SLOTS.indexOf(startSlot);
+  if (startIdx === -1) return [];
+  const count = durationToSlotCount(durationMinutes);
+  return SLOTS.slice(startIdx, startIdx + count);
+}
+
 export function buildSlots(): string[] {
   // returns "10:00", "10:15", "10:30", "10:45", "11:00", ... "21:45"
   const slots: string[] = [];
