@@ -93,9 +93,46 @@ export function buildSlots(): string[] {
 
 export const SLOTS = buildSlots();
 
+// India timezone for all date/time calculations
+const INDIA_TIMEZONE = "Asia/Kolkata";
+
+/**
+ * Get current date/time parts in India timezone
+ */
+function getIndiaTime(): {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+} {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: INDIA_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(now);
+  const get = (type: string) =>
+    parseInt(parts.find((p) => p.type === type)?.value || "0", 10);
+
+  return {
+    year: get("year"),
+    month: get("month"),
+    day: get("day"),
+    hour: get("hour"),
+    minute: get("minute"),
+  };
+}
+
 export function todayYmd(offsetDays: number = 0): string {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
+  const india = getIndiaTime();
+  const d = new Date(india.year, india.month - 1, india.day);
   d.setDate(d.getDate() + offsetDays);
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -104,15 +141,14 @@ export function todayYmd(offsetDays: number = 0): string {
 }
 
 export function isDateAllowed(ymd: string): boolean {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const india = getIndiaTime();
+  const todayDate = new Date(india.year, india.month - 1, india.day);
 
   const [y, m, d] = ymd.split("-").map(Number);
   if (!y || !m || !d) return false;
   const dt = new Date(y, m - 1, d);
-  dt.setHours(0, 0, 0, 0);
 
-  const diffMs = dt.getTime() - today.getTime();
+  const diffMs = dt.getTime() - todayDate.getTime();
   const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
   return diffDays >= 0 && diffDays <= 2;
 }
@@ -120,9 +156,10 @@ export function isDateAllowed(ymd: string): boolean {
 /**
  * Check if a slot time has already passed for the given date.
  * Returns true if the slot is in the past (and should be unavailable).
+ * Uses India timezone (Asia/Kolkata) for consistent behavior on Vercel.
  */
 export function isSlotPast(ymd: string, slot: string): boolean {
-  const now = new Date();
+  const india = getIndiaTime();
   const todayStr = todayYmd(0);
 
   // Only check for today's date - future dates are always valid
@@ -132,8 +169,8 @@ export function isSlotPast(ymd: string, slot: string): boolean {
   const [slotHour, slotMinute] = slot.split(":").map(Number);
   if (isNaN(slotHour) || isNaN(slotMinute)) return false;
 
-  const currentHour = now.getHours();
-  const currentMinute = now.getMinutes();
+  const currentHour = india.hour;
+  const currentMinute = india.minute;
 
   // Slot is past if current time >= slot time
   if (currentHour > slotHour) return true;
