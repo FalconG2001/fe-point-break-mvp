@@ -20,9 +20,11 @@ import {
 } from "@mui/material";
 import CancelIcon from "@mui/icons-material/Cancel";
 import RestoreIcon from "@mui/icons-material/Restore";
+import AddIcon from "@mui/icons-material/Add";
 import { signOut } from "next-auth/react";
 import DateTabs from "./DateTabs";
 import { todayYmd, CONSOLES } from "@/lib/config";
+import AdminCreateBookingDialog from "./AdminCreateBookingDialog";
 
 type SelectionWithDuration = {
   consoleId: string;
@@ -39,6 +41,7 @@ type AdminBooking = {
   customer: { name: string; phone: string };
   confirmed: boolean;
   createdAt: string;
+  bookingFrom?: "website" | "whatsapp" | "admin";
 };
 
 type ApiResp = {
@@ -55,6 +58,7 @@ export default function AdminDashboard() {
   const [data, setData] = React.useState<ApiResp | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
 
   async function load(d: string) {
     setLoading(true);
@@ -120,13 +124,23 @@ export default function AdminDashboard() {
           <Typography variant="h5" fontWeight={900}>
             Admin dashboard
           </Typography>
-          <Button
-            variant="outlined"
-            onClick={() => signOut()}
-            sx={{ borderRadius: 3 }}
-          >
-            Sign out
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setCreateDialogOpen(true)}
+              sx={{ borderRadius: 3 }}
+            >
+              Create Booking
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => signOut()}
+              sx={{ borderRadius: 3 }}
+            >
+              Sign out
+            </Button>
+          </Stack>
         </Stack>
 
         <DateTabs value={date} onChange={setDate} />
@@ -158,6 +172,7 @@ export default function AdminDashboard() {
                   <TableHead>
                     <TableRow>
                       <TableCell>Status</TableCell>
+                      <TableCell>Source</TableCell>
                       <TableCell>Time</TableCell>
                       <TableCell>Booked by</TableCell>
                       <TableCell>Phone</TableCell>
@@ -182,6 +197,20 @@ export default function AdminDashboard() {
                             size="small"
                             label={b.confirmed ? "Active" : "Cancelled"}
                             color={b.confirmed ? "success" : "error"}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            size="small"
+                            variant="outlined"
+                            label={b.bookingFrom || "website"}
+                            color={
+                              b.bookingFrom === "whatsapp"
+                                ? "success"
+                                : b.bookingFrom === "admin"
+                                  ? "warning"
+                                  : "default"
+                            }
                           />
                         </TableCell>
                         <TableCell>{b.slot}</TableCell>
@@ -233,6 +262,13 @@ export default function AdminDashboard() {
             </Stack>
           )}
         </Paper>
+
+        <AdminCreateBookingDialog
+          open={createDialogOpen}
+          onClose={() => setCreateDialogOpen(false)}
+          onSuccess={() => load(date)}
+          defaultDate={date}
+        />
       </Stack>
     </Container>
   );

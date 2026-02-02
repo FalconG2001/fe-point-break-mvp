@@ -206,8 +206,8 @@ async function handleDateSelection(from: string, replyId: string) {
 
   // Group slots for better UX (show every 30 mins)
   const slotRows = availableSlots
-    .filter((_, i) => i % 2 === 0) // Show every 30 min slot
-    .slice(0, 10) // Max 10 items per section
+    // .filter((_, i) => i % 2 === 0) // Show every 30 min slot
+    // .slice(0, 10) // Max 10 items per section
     .map((s) => ({
       id: `slot_${s.slot}`,
       title: s.slot,
@@ -412,8 +412,8 @@ async function handleConfirmation(
         phone: from,
       },
       confirmed: true,
+      bookingFrom: "whatsapp",
       createdAt: new Date().toISOString(),
-      source: "whatsapp",
     };
 
     await db.collection("bookings").insertOne(doc);

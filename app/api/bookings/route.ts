@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { date, slot, selections, name, phone } = parsed.data;
+  const { date, slot, selections, name, phone, bookingFrom } = parsed.data;
 
   if (!isDateAllowed(date)) {
     return NextResponse.json({ error: "Date not allowed" }, { status: 400 });
@@ -154,6 +154,7 @@ export async function POST(req: Request) {
     selections,
     customer: { name, phone },
     confirmed: true, // New bookings are confirmed by default
+    bookingFrom,
     createdAt: new Date().toISOString(),
   };
 

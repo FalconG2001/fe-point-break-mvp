@@ -24,6 +24,11 @@ export const BookingSelectionSchema = z.object({
     .refine((v) => DURATION_OPTIONS.includes(v as any), "Invalid duration"),
 });
 
+// Booking source tracking
+export const BOOKING_SOURCES = ["website", "whatsapp", "admin"] as const;
+export type BookingSource = (typeof BOOKING_SOURCES)[number];
+export const BookingSourceSchema = z.enum(BOOKING_SOURCES);
+
 export const CreateBookingSchema = z.object({
   date: z
     .string()
@@ -39,4 +44,5 @@ export const CreateBookingSchema = z.object({
     .min(7)
     .max(20)
     .regex(/^[0-9+()\-\s]+$/, "Phone looks invalid."),
+  bookingFrom: BookingSourceSchema.optional().default("website"),
 });
