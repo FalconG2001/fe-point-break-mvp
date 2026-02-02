@@ -94,12 +94,19 @@ async function handleMessage(
   const replyId = message.interactiveReplyId || "";
 
   // Handle reset/cancel commands anytime
-  if (text === "cancel" || text === "reset" || text === "start over") {
+  const resetKeywords = [
+    "cancel",
+    "reset",
+    "start over",
+    "book",
+    "hi",
+    "hello",
+    "hey",
+    "start",
+  ];
+  if (resetKeywords.includes(text)) {
     await clearSession(from);
-    await sendTextMessage(
-      from,
-      "Booking cancelled. Send 'book' to start a new booking.",
-    );
+    await handleIdle(from, text);
     return;
   }
 
@@ -161,7 +168,7 @@ async function handleIdle(from: string, text: string) {
   await sendListMessage(
     from,
     `${CENTRE_NAME} Booking`,
-    "Welcome! 🎮\n\nLet's book your gaming session. First, pick a date:",
+    "Welcome! 🎮\n\nLet's book your gaming session. First, pick a date:\n\n(Send 'cancel' to start over)",
     "Select Date",
     [
       {
@@ -217,7 +224,7 @@ async function handleDateSelection(from: string, replyId: string) {
   await sendListMessage(
     from,
     "Select Time Slot",
-    `📅 ${formatDateDisplay(date)}\n\nChoose your preferred time:`,
+    `📅 ${formatDateDisplay(date)}\n\nChoose your preferred time:\n\n(Send 'cancel' to start over)`,
     "Select Time",
     [{ title: "Available Slots", rows: slotRows }],
   );
@@ -265,7 +272,7 @@ async function handleSlotSelection(
 
   await sendButtonMessage(
     from,
-    `📅 ${formatDateDisplay(date)} at ${slot}\n\nSelect your console:`,
+    `📅 ${formatDateDisplay(date)} at ${slot}\n\nSelect your console:\n\n(Send 'cancel' to start over)`,
     consoleButtons,
   );
 }
@@ -297,7 +304,7 @@ async function handleConsoleSelection(
 
   await sendTextMessage(
     from,
-    `Great choice! 🎮 ${consoleName}\n\nPlease enter your name for the booking:`,
+    `Great choice! 🎮 ${consoleName}\n\nPlease enter your name for the booking:\n\n(Send 'cancel' to start over)`,
   );
 }
 
@@ -343,7 +350,7 @@ async function handleNameInput(
       `🎮 Console: ${consoleName}\n` +
       `⏱️ Duration: ${duration} mins\n` +
       `👤 Name: ${name}\n\n` +
-      `Confirm your booking?`,
+      `Confirm your booking?\n\n(Send 'cancel' to start over)`,
     [
       { id: "confirm_yes", title: "✅ Confirm" },
       { id: "confirm_no", title: "❌ Cancel" },
