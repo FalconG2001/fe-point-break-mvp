@@ -57,25 +57,44 @@ export async function GET(req: Request) {
  */
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    const rawBody = await req.text();
+    console.log("Incoming WhatsApp Webhook Body:", rawBody);
+
+    let body;
+    try {
+      body = JSON.parse(rawBody);
+    } catch (e) {
+      console.error("Failed to parse JSON body:", e);
+      return NextResponse.json(
+        { status: "error", message: "Invalid JSON" },
+        { status: 400 },
+      );
+    }
 
     // Parse the incoming message
     const message = parseWebhookMessage(body);
+    console.log("Parsed WhatsApp Message:", message);
 
     // If no message (could be status update), acknowledge
     if (!message) {
+      console.log(
+        "No valid message found in webhook payload (likely a status update)",
+      );
       return NextResponse.json({ status: "ok" });
     }
 
     // Get or create session for this user
+    console.log(`Getting session for ${message.from}`);
     const session = await getSession(message.from);
+    console.log(`Current state for ${message.from}: ${session.state}`);
 
     // Route based on session state and message type
     await handleMessage(message.from, session.state, session.data, message);
 
+    console.log(`Successfully handled message from ${message.from}`);
     return NextResponse.json({ status: "ok" });
   } catch (error) {
-    console.error("Webhook error:", error);
+    console.error("Webhook processing error:", error);
     // Always return 200 to acknowledge receipt (Meta requires this)
     return NextResponse.json({ status: "error" });
   }

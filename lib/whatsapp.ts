@@ -51,7 +51,13 @@ export async function sendTextMessage(to: string, text: string): Promise<void> {
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
 
+  console.log(`Attempting to send text message to ${to}`);
+
   if (!phoneNumberId || !accessToken) {
+    console.error("WhatsApp credentials missing:", {
+      phoneNumberId: !!phoneNumberId,
+      accessToken: !!accessToken,
+    });
     throw new Error("WhatsApp credentials not configured");
   }
 
@@ -62,23 +68,29 @@ export async function sendTextMessage(to: string, text: string): Promise<void> {
     text: { body: text },
   };
 
-  const response = await fetch(
-    `${WHATSAPP_API_URL}/${phoneNumberId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(message),
+  const url = `${WHATSAPP_API_URL}/${phoneNumberId}/messages`;
+  console.log(`POSTing to ${url}`);
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify(message),
+  });
 
   if (!response.ok) {
-    const error = await response.text();
-    console.error("WhatsApp API error:", error);
+    const errorBody = await response.text();
+    console.error("WhatsApp API error details:", {
+      status: response.status,
+      statusText: response.statusText,
+      body: errorBody,
+    });
     throw new Error(`Failed to send message: ${response.status}`);
   }
+
+  console.log(`Successfully sent text message to ${to}`);
 }
 
 /**
@@ -97,7 +109,13 @@ export async function sendListMessage(
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
 
+  console.log(`Attempting to send list message to ${to}`);
+
   if (!phoneNumberId || !accessToken) {
+    console.error("WhatsApp credentials missing:", {
+      phoneNumberId: !!phoneNumberId,
+      accessToken: !!accessToken,
+    });
     throw new Error("WhatsApp credentials not configured");
   }
 
@@ -116,23 +134,29 @@ export async function sendListMessage(
     },
   };
 
-  const response = await fetch(
-    `${WHATSAPP_API_URL}/${phoneNumberId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(message),
+  const url = `${WHATSAPP_API_URL}/${phoneNumberId}/messages`;
+  console.log(`POSTing to ${url}`);
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify(message),
+  });
 
   if (!response.ok) {
-    const error = await response.text();
-    console.error("WhatsApp API error:", error);
+    const errorBody = await response.text();
+    console.error("WhatsApp API error details:", {
+      status: response.status,
+      statusText: response.statusText,
+      body: errorBody,
+    });
     throw new Error(`Failed to send list message: ${response.status}`);
   }
+
+  console.log(`Successfully sent list message to ${to}`);
 }
 
 /**
@@ -146,7 +170,13 @@ export async function sendButtonMessage(
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
 
+  console.log(`Attempting to send button message to ${to}`);
+
   if (!phoneNumberId || !accessToken) {
+    console.error("WhatsApp credentials missing:", {
+      phoneNumberId: !!phoneNumberId,
+      accessToken: !!accessToken,
+    });
     throw new Error("WhatsApp credentials not configured");
   }
 
@@ -169,23 +199,29 @@ export async function sendButtonMessage(
     },
   };
 
-  const response = await fetch(
-    `${WHATSAPP_API_URL}/${phoneNumberId}/messages`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(message),
+  const url = `${WHATSAPP_API_URL}/${phoneNumberId}/messages`;
+  console.log(`POSTing to ${url}`);
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
     },
-  );
+    body: JSON.stringify(message),
+  });
 
   if (!response.ok) {
-    const error = await response.text();
-    console.error("WhatsApp API error:", error);
+    const errorBody = await response.text();
+    console.error("WhatsApp API error details:", {
+      status: response.status,
+      statusText: response.statusText,
+      body: errorBody,
+    });
     throw new Error(`Failed to send button message: ${response.status}`);
   }
+
+  console.log(`Successfully sent button message to ${to}`);
 }
 
 /**
