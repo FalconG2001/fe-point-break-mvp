@@ -11,14 +11,18 @@ type Props = {
 
 export default function TimeSlotPicker({ slots, value, onChange }: Props) {
   return (
-    <Stack spacing={1}>
-      <Typography variant="h6" fontWeight={800}>
-        Choose a time slot
+    <Stack spacing={2}>
+      <Typography variant="h6" fontWeight={800} sx={{ mt: 1 }}>
+        Available Slots
       </Typography>
-      <Grid container spacing={1}>
+      <Grid container spacing={1.5}>
         {slots.map((s) => {
-          const disabled = s.availableConsoleIds.length === 0;
+          const disabled = s.availableConsoleIds.length === 0 || s.isPast;
           const selected = value === s.slot;
+
+          let statusColor = "success";
+          if (disabled) statusColor = "error";
+          else if (s.tvCapacityRemaining <= 2) statusColor = "warning";
 
           return (
             <Grid key={s.slot} size={{ xs: 6, sm: 4, md: 3 }}>
@@ -28,12 +32,30 @@ export default function TimeSlotPicker({ slots, value, onChange }: Props) {
                 onClick={() => onChange(s.slot)}
                 disabled={disabled}
                 sx={{
-                  py: 1.25,
-                  borderRadius: 3,
-                  justifyContent: "space-between",
+                  py: 1.5,
+                  px: 2,
+                  borderRadius: 1,
+                  borderWidth: 1,
+                  borderColor: selected ? "#000" : "rgba(0, 0, 0, 0.1)",
+                  background: selected ? "#000" : "rgba(0, 0, 0, 0.02)",
+                  color: selected ? "#fff" : "text.primary",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 0.5,
+                  "&:hover": {
+                    background: selected ? "#222" : "rgba(0, 0, 0, 0.05)",
+                    borderColor: "#000",
+                  },
+                  "&.Mui-disabled": {
+                    opacity: 0.3,
+                    border: "1px solid rgba(0, 0, 0, 0.05)",
+                  },
                 }}
               >
-                <span>{s.slot}</span>
+                <Typography variant="subtitle2" fontWeight={800}>
+                  {s.slot}
+                </Typography>
                 <Chip
                   size="small"
                   label={
@@ -43,7 +65,18 @@ export default function TimeSlotPicker({ slots, value, onChange }: Props) {
                         ? "Full"
                         : `${s.tvCapacityRemaining} TV left`
                   }
-                  sx={{ ml: 1 }}
+                  variant={selected ? "filled" : "outlined"}
+                  sx={{
+                    height: 18,
+                    fontSize: "0.6rem",
+                    fontWeight: 700,
+                    borderRadius: 0.5,
+                    backgroundColor: selected
+                      ? "rgba(255,255,255,0.1)"
+                      : "transparent",
+                    color: selected ? "inherit" : "text.secondary",
+                    border: selected ? "none" : "1px solid rgba(0,0,0,0.05)",
+                  }}
                 />
               </Button>
             </Grid>

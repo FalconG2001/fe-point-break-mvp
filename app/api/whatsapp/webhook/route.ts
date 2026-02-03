@@ -112,7 +112,7 @@ async function handleMessage(
   const text = message.text?.toLowerCase().trim() || "";
   const replyId = message.interactiveReplyId || "";
 
-  // Handle reset/cancel commands anytime
+  // Handle reset/cancel/ping commands anytime
   const resetKeywords = [
     "cancel",
     "reset",
@@ -122,8 +122,14 @@ async function handleMessage(
     "hello",
     "hey",
     "start",
+    "ping",
   ];
   if (resetKeywords.includes(text)) {
+    console.log(`Command detected: ${text}`);
+    if (text === "ping") {
+      await sendTextMessage(from, "pong 🏓");
+      return;
+    }
     await clearSession(from);
     await handleIdle(from, text);
     return;

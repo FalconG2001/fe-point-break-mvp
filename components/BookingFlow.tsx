@@ -136,11 +136,42 @@ export default function BookingFlow() {
   }
 
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 2, sm: 4 } }}>
-      <Stack spacing={3}>
+    <Container maxWidth="md" sx={{ py: { xs: 4, sm: 8 } }}>
+      <Stack spacing={4}>
         <ConsoleCards />
-        <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, borderRadius: 4 }}>
-          <Stepper activeStep={activeStep} alternativeLabel>
+
+        <Paper
+          className="glass-panel"
+          elevation={0}
+          sx={{
+            p: { xs: 3, sm: 6 },
+            borderRadius: 1,
+            background: "rgba(255, 255, 255, 0.5)",
+          }}
+        >
+          <Stepper
+            activeStep={activeStep}
+            alternativeLabel
+            sx={{
+              mb: 6,
+              "& .MuiStepLabel-label": {
+                fontWeight: 700,
+                mt: 1,
+                fontSize: "0.85rem",
+                color: "text.secondary",
+                "&.Mui-active": { color: "text.primary" },
+                "&.Mui-completed": { color: "text.primary" },
+              },
+              "& .MuiStepIcon-root": {
+                width: 24,
+                height: 24,
+                color: "rgba(0,0,0,0.05)",
+                "&.Mui-active": { color: "text.primary" },
+                "&.Mui-completed": { color: "text.primary" },
+                "& .MuiStepIcon-text": { fill: "#fff" },
+              },
+            }}
+          >
             {steps.map((label) => (
               <Step key={label}>
                 <StepLabel>{label}</StepLabel>
@@ -148,17 +179,27 @@ export default function BookingFlow() {
             ))}
           </Stepper>
 
-          <Stack spacing={2} sx={{ mt: 2 }}>
-            <Typography variant="h6" fontWeight={800}>
-              Choose a date
-            </Typography>
-
-            <DateTabs value={date} onChange={setDate} />
+          <Stack spacing={4}>
+            <Stack spacing={1}>
+              <Typography variant="h6" fontWeight={800} color="text.primary">
+                Secure your slot
+              </Typography>
+              <DateTabs value={date} onChange={setDate} />
+            </Stack>
 
             <Divider />
 
             {loadingAvail && (
-              <Alert severity="info">Loading availability...</Alert>
+              <Stack
+                direction="row"
+                spacing={2}
+                alignItems="center"
+                sx={{ py: 4, justifyContent: "center" }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  Accessing availability...
+                </Typography>
+              </Stack>
             )}
 
             {!loadingAvail && availability && (
@@ -182,26 +223,58 @@ export default function BookingFlow() {
                 onChange={setSelection}
               />
             ) : (
-              <Alert severity="info">
-                Pick a slot first. Then you can choose consoles.
-              </Alert>
+              <Paper
+                sx={{
+                  p: 3,
+                  borderRadius: 1,
+                  textAlign: "center",
+                  background: "rgba(0, 0, 0, 0.01)",
+                  border: "1px dashed rgba(0, 0, 0, 0.1)",
+                }}
+              >
+                <Typography variant="body2" color="text.secondary">
+                  Pick a time slot first to see available consoles.
+                </Typography>
+              </Paper>
             )}
 
             <Divider />
 
-            <Button
-              variant="contained"
-              size="large"
-              disabled={!canContinue}
-              onClick={() => setConfirmOpen(true)}
-              sx={{ borderRadius: 3, py: 1.4 }}
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
             >
-              Continue
-            </Button>
-
-            <Typography variant="caption" color="text.secondary">
-              If a slot is full, it means all TVs are already booked.
-            </Typography>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ maxWidth: "60%" }}
+              >
+                Select your preferred consoles and duration. We'll handle the
+                rest.
+              </Typography>
+              <Button
+                variant="contained"
+                size="large"
+                disabled={!canContinue}
+                onClick={() => setConfirmOpen(true)}
+                sx={{
+                  borderRadius: 1,
+                  px: 6,
+                  py: 1.5,
+                  fontSize: "0.95rem",
+                  background: "#000",
+                  color: "#fff",
+                  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.1)",
+                  "&:hover": {
+                    background: "#222",
+                    transform: "translateY(-1px)",
+                  },
+                }}
+              >
+                Proceed to Booking
+              </Button>
+            </Stack>
           </Stack>
         </Paper>
       </Stack>

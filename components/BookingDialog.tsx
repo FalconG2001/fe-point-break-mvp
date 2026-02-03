@@ -11,6 +11,9 @@ import {
   Stack,
   Alert,
   Typography,
+  Chip,
+  Divider,
+  Paper,
 } from "@mui/material";
 import type { ConsoleId, DurationMinutes } from "@/lib/config";
 import { CONSOLES, DURATION_LABELS } from "@/lib/config";
@@ -58,52 +61,133 @@ export default function BookingDialog({
       open={open}
       onClose={loading ? undefined : onClose}
       fullWidth
-      maxWidth="sm"
+      maxWidth="xs"
+      PaperProps={{
+        sx: {
+          borderRadius: 1,
+          background: "#ffffff",
+          backgroundImage: "none",
+          border: "1px solid rgba(0, 0, 0, 0.1)",
+          boxShadow: "0 20px 40px rgba(0, 0, 0, 0.1)",
+        },
+      }}
     >
-      <DialogTitle>Confirm booking</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ mt: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            {summary.date} • Starting at {summary.slot}
-          </Typography>
-          <Stack spacing={0.5}>
-            {summary.selections.map((s) => (
-              <Typography key={s.consoleId} variant="body2">
-                •{" "}
-                {CONSOLES.find((c) => c.id === s.consoleId)?.name ??
-                  s.consoleId}{" "}
-                — {s.players} players, {DURATION_LABELS[s.duration]}
-              </Typography>
-            ))}
+      <DialogTitle sx={{ textAlign: "center", pt: 4 }}>
+        <Typography variant="h5" fontWeight={900}>
+          Confirm Booking
+        </Typography>
+      </DialogTitle>
+      <DialogContent sx={{ px: 4 }}>
+        <Stack spacing={4} sx={{ mt: 1 }}>
+          <Paper
+            sx={{
+              p: 2.5,
+              borderRadius: 1,
+              background: "rgba(0, 0, 0, 0.02)",
+              border: "1px solid rgba(0, 0, 0, 0.05)",
+            }}
+          >
+            <Stack spacing={1.5}>
+              <Stack direction="row" justifyContent="space-between">
+                <Typography variant="caption" color="text.secondary">
+                  Schedule
+                </Typography>
+                <Typography variant="body2" fontWeight={700}>
+                  {summary.date} @ {summary.slot}
+                </Typography>
+              </Stack>
+              <Divider />
+              <Stack spacing={1}>
+                <Typography variant="caption" color="text.secondary">
+                  Consoles
+                </Typography>
+                {summary.selections.map((s) => (
+                  <Stack
+                    key={s.consoleId}
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                  >
+                    <Typography variant="body2" fontWeight={700}>
+                      {CONSOLES.find((c) => c.id === s.consoleId)?.name ??
+                        s.consoleId}
+                    </Typography>
+                    <Chip
+                      label={`${s.players}P • ${DURATION_LABELS[s.duration]}`}
+                      size="small"
+                      sx={{
+                        height: 20,
+                        fontSize: "0.65rem",
+                        borderRadius: 0.5,
+                        background: "rgba(0,0,0,0.05)",
+                      }}
+                    />
+                  </Stack>
+                ))}
+              </Stack>
+            </Stack>
+          </Paper>
+
+          <Stack spacing={2.5}>
+            <TextField
+              label="What's your name?"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. John Doe"
+              fullWidth
+              variant="filled"
+              hiddenLabel
+              InputProps={{
+                disableUnderline: true,
+                sx: { borderRadius: 1, background: "rgba(0, 0, 0, 0.03)" },
+              }}
+            />
+            <TextField
+              label="Phone number"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="e.g. +91 98765 43210"
+              fullWidth
+              variant="filled"
+              InputProps={{
+                disableUnderline: true,
+                sx: { borderRadius: 1, background: "rgba(0, 0, 0, 0.03)" },
+              }}
+            />
+            {error && (
+              <Alert severity="error" sx={{ borderRadius: 1 }}>
+                {error}
+              </Alert>
+            )}
           </Stack>
-          <TextField
-            label="Booking name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Eg: Rahul"
-            fullWidth
-          />
-          <TextField
-            label="Phone number"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="Eg: +91 98765 43210"
-            fullWidth
-          />
-          {error && <Alert severity="error">{error}</Alert>}
         </Stack>
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} disabled={loading}>
+      <DialogActions
+        sx={{ px: 4, pb: 4, pt: 2, justifyContent: "space-between" }}
+      >
+        <Button
+          onClick={onClose}
+          disabled={loading}
+          color="inherit"
+          sx={{ fontSize: "0.8rem" }}
+        >
           Back
         </Button>
         <Button
           variant="contained"
           onClick={() => onConfirm({ name, phone })}
           disabled={!canSubmit}
+          sx={{
+            borderRadius: 1,
+            px: 4,
+            py: 1.2,
+            background: "#000",
+            color: "#fff",
+            "&:hover": { background: "#222" },
+          }}
         >
-          {loading ? "Booking..." : "Book now"}
+          {loading ? "Confirming..." : "Confirm & Book"}
         </Button>
       </DialogActions>
     </Dialog>

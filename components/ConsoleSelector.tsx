@@ -13,6 +13,8 @@ import {
   FormControl,
   InputLabel,
   Alert,
+  Paper,
+  Chip,
 } from "@mui/material";
 import {
   CONSOLES,
@@ -39,6 +41,13 @@ type Props = {
 
 const DEFAULT_DURATION: DurationMinutes = 60;
 
+const BRAND_COLORS: Record<string, string> = {
+  ps5: "#0072ce",
+  xbox: "#107c10",
+  switch: "#e60012",
+  pc: "#6366f1",
+};
+
 export default function ConsoleSelector({
   availableConsoleIds,
   tvCapacityRemaining,
@@ -64,39 +73,41 @@ export default function ConsoleSelector({
     });
   };
 
-  const setPlayers = (id: ConsoleId, players: number) => {
-    const prev = value[id] ?? {
-      selected: false,
-      players: MIN_PLAYERS,
-      duration: DEFAULT_DURATION,
-    };
-    onChange({
-      ...value,
-      [id]: { ...prev, players },
-    });
-  };
-
-  const setDuration = (id: ConsoleId, duration: DurationMinutes) => {
-    const prev = value[id] ?? {
-      selected: false,
-      players: MIN_PLAYERS,
-      duration: DEFAULT_DURATION,
-    };
-    onChange({
-      ...value,
-      [id]: { ...prev, duration },
-    });
-  };
-
   if (availableConsoleIds.length === 0) {
-    return <Alert severity="info">No consoles available in this slot.</Alert>;
+    return (
+      <Paper
+        sx={{
+          p: 3,
+          borderRadius: 1,
+          background: "rgba(239, 68, 68, 0.05)",
+          border: "1px solid rgba(239, 68, 68, 0.1)",
+        }}
+      >
+        <Typography variant="body2" color="error">
+          No consoles available in this slot.
+        </Typography>
+      </Paper>
+    );
   }
 
   return (
-    <Stack spacing={1}>
-      <Typography variant="h6" fontWeight={800}>
-        Pick consoles (max {maxPick})
-      </Typography>
+    <Stack spacing={2.5}>
+      <Stack direction="row" spacing={1} alignItems="center">
+        <Typography variant="h6" fontWeight={800} sx={{ fontSize: "1rem" }}>
+          Choose Consoles
+        </Typography>
+        <Chip
+          label={`${pickedCount} / ${maxPick} Selected`}
+          size="small"
+          sx={{
+            fontWeight: 700,
+            borderRadius: 0.5,
+            background: "rgba(0,0,0,0.05)",
+            color: "text.primary",
+          }}
+        />
+      </Stack>
+
       <Grid container spacing={2}>
         {CONSOLES.filter((c) => availableConsoleIds.includes(c.id)).map((c) => {
           const item = value[c.id] ?? {
@@ -108,24 +119,46 @@ export default function ConsoleSelector({
 
           return (
             <Grid key={c.id} size={{ xs: 12, sm: 6 }}>
-              <Card variant="outlined" sx={{ height: "100%" }}>
-                <CardContent>
-                  <Stack spacing={2}>
+              <Card
+                sx={{
+                  height: "100%",
+                  borderRadius: 1,
+                  border: item.selected
+                    ? `1px solid #000`
+                    : "1px solid rgba(0, 0, 0, 0.08)",
+                  background: item.selected ? "rgba(0, 0, 0, 0.02)" : "#ffffff",
+                  transition: "all 0.2s ease",
+                  opacity: disabled ? 0.4 : 1,
+                  "&:hover": {
+                    borderColor: item.selected ? "#000" : "rgba(0, 0, 0, 0.2)",
+                  },
+                }}
+              >
+                <CardContent sx={{ p: 2.5 }}>
+                  <Stack spacing={2.5}>
                     <FormControlLabel
                       control={
                         <Checkbox
                           checked={item.selected}
                           onChange={(e) => toggle(c.id, e.target.checked)}
                           disabled={disabled}
+                          sx={{
+                            color: "rgba(0,0,0,0.1)",
+                            "&.Mui-checked": { color: "#000" },
+                          }}
                         />
                       }
-                      label={<Typography fontWeight={700}>{c.name}</Typography>}
+                      label={
+                        <Typography fontWeight={800} variant="subtitle2">
+                          {c.name}
+                        </Typography>
+                      }
                     />
 
-                    <Stack direction="row" spacing={1}>
+                    <Stack direction="row" spacing={1.5}>
                       <FormControl
                         size="small"
-                        sx={{ minWidth: 100 }}
+                        fullWidth
                         disabled={!item.selected}
                       >
                         <InputLabel>Players</InputLabel>
@@ -133,8 +166,15 @@ export default function ConsoleSelector({
                           label="Players"
                           value={item.players}
                           onChange={(e) =>
-                            setPlayers(c.id, Number(e.target.value))
+                            onChange({
+                              ...value,
+                              [c.id]: {
+                                ...item,
+                                players: Number(e.target.value),
+                              },
+                            })
                           }
+                          sx={{ borderRadius: 1, background: "#fff" }}
                         >
                           {Array.from({
                             length: MAX_PLAYERS - MIN_PLAYERS + 1,
@@ -142,7 +182,7 @@ export default function ConsoleSelector({
                             const v = MIN_PLAYERS + i;
                             return (
                               <MenuItem key={v} value={v}>
-                                {v}
+                                {v} {v === 1 ? "Player" : "Players"}
                               </MenuItem>
                             );
                           })}
@@ -151,7 +191,7 @@ export default function ConsoleSelector({
 
                       <FormControl
                         size="small"
-                        sx={{ minWidth: 120 }}
+                        fullWidth
                         disabled={!item.selected}
                       >
                         <InputLabel>Duration</InputLabel>
@@ -159,11 +199,17 @@ export default function ConsoleSelector({
                           label="Duration"
                           value={item.duration}
                           onChange={(e) =>
-                            setDuration(
-                              c.id,
-                              Number(e.target.value) as DurationMinutes,
-                            )
+                            onChange({
+                              ...value,
+                              [c.id]: {
+                                ...item,
+                                duration: Number(
+                                  e.target.value,
+                                ) as DurationMinutes,
+                              },
+                            })
                           }
+                          sx={{ borderRadius: 1, background: "#fff" }}
                         >
                           {DURATION_OPTIONS.map((d) => (
                             <MenuItem key={d} value={d}>
@@ -174,7 +220,7 @@ export default function ConsoleSelector({
                       </FormControl>
                     </Stack>
 
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="caption" color="text.secondary">
                       {c.notes}
                     </Typography>
                   </Stack>
@@ -184,12 +230,6 @@ export default function ConsoleSelector({
           );
         })}
       </Grid>
-      {pickedCount >= maxPick && (
-        <Alert severity="warning">
-          You reached TV limit for this slot. Uncheck one console to pick
-          another.
-        </Alert>
-      )}
     </Stack>
   );
 }
