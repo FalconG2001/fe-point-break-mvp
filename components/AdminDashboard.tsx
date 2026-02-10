@@ -14,7 +14,6 @@ import {
   TableBody,
   Chip,
   Button,
-  Divider,
   IconButton,
   Tooltip,
   Grid,
@@ -70,6 +69,8 @@ export default function AdminDashboard() {
       );
       const json = (await res.json()) as ApiResp;
       if (!res.ok) throw new Error(json.error || "Failed to load admin data");
+      console.log(json);
+
       setData(json);
     } catch (e: any) {
       setData({
@@ -211,7 +212,7 @@ export default function AdminDashboard() {
             borderRadius: 1,
             background: "rgba(255, 255, 255, 0.5)",
             border: "1px solid rgba(0, 0, 0, 0.08)",
-            overflow: "hidden",
+            overflowX: "auto",
           }}
         >
           {loading && (

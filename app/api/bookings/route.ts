@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import {
   CONSOLES,
-  SLOTS,
   TV_COUNT,
   type ConsoleId,
   isDateAllowed,

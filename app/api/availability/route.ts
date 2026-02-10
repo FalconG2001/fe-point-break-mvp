@@ -2,12 +2,12 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import {
   CONSOLES,
-  SLOTS,
   TV_COUNT,
   type ConsoleId,
   isDateAllowed,
   isSlotPast,
   getSlotsForDuration,
+  getStartSlotsForDate,
 } from "@/lib/config";
 
 export async function GET(req: Request) {
@@ -49,21 +49,30 @@ export async function GET(req: Request) {
   }
 
   const allIds = CONSOLES.map((c) => c.id);
-  const slots = SLOTS.map((slot) => {
-    // Check if slot is in the past for today
-    const isPast = isSlotPast(date, slot);
+  const duration = Number(url.searchParams.get("duration") || "60") || 60;
 
-    const booked = Array.from(bySlot.get(slot) ?? new Set<ConsoleId>());
-    const bookedCount = booked.length;
-    const tvRemaining = isPast ? 0 : Math.max(0, TV_COUNT - bookedCount);
+  const startSlots = getStartSlotsForDate(date, duration);
+
+  const slots = startSlots.map((startSlot) => {
+    const isPast = isSlotPast(date, startSlot);
+
+    const covered = getSlotsForDuration(startSlot, duration);
+    const bookedSet = new Set<ConsoleId>();
+
+    for (const t of covered) {
+      for (const cid of bySlot.get(t) ?? []) bookedSet.add(cid);
+    }
+
+    const booked = Array.from(bookedSet);
+    const tvRemaining = isPast ? 0 : Math.max(0, TV_COUNT - booked.length);
 
     const available =
       tvRemaining <= 0
         ? []
-        : (allIds.filter((id) => !booked.includes(id)) as ConsoleId[]);
+        : (allIds.filter((id) => !bookedSet.has(id)) as ConsoleId[]);
 
     return {
-      slot,
+      slot: startSlot,
       bookedConsoleIds: booked,
       availableConsoleIds: available,
       tvCapacityRemaining: tvRemaining,

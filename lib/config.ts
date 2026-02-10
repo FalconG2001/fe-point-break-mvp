@@ -1,5 +1,15 @@
 export type ConsoleId = "xbox-series-x" | "xbox-one-s" | "ps5" | "xbox-360";
 
+export const SLOT_LENGTH_MINUTES = 15;
+
+const WEEKDAY_OPEN = 11 * 60; // 11:00
+const WEEKDAY_BREAK_START = 17 * 60 + 30; // 17:30
+const WEEKDAY_BREAK_END = 19 * 60; // 19:00
+const WEEKDAY_CLOSE = 21 * 60; // 21:00
+
+const SUNDAY_OPEN = 10 * 60; // 10:00
+const SUNDAY_CLOSE = 18 * 60 + 30; // 18:30
+
 export const CENTRE_NAME = "Point Break";
 
 export const TV_COUNT = 3;
@@ -37,7 +47,6 @@ export const CONSOLES: Array<{
 ];
 
 // Slot rules (MVP):
-export const SLOT_LENGTH_MINUTES = 15;
 export const OPEN_HOUR = 10; // 10:00
 export const CLOSE_HOUR = 22; // 22:00 (last slot starts at 21:45)
 
@@ -58,24 +67,83 @@ export const DURATION_LABELS: Record<DurationMinutes, string> = {
   180: "3 hours",
 };
 
-/**
- * Calculate how many 15-min slots a duration occupies
- */
-export function durationToSlotCount(durationMinutes: number): number {
-  return Math.ceil(durationMinutes / SLOT_LENGTH_MINUTES);
+function timeToMinutes(t: string): number {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function minutesToTime(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function dayOfWeekFromYmd(ymd: string): number {
+  const [y, mo, d] = ymd.split("-").map(Number);
+  return new Date(y, mo - 1, d).getDay(); // 0=Sun ... 6=Sat
 }
 
 /**
- * Get all slot times that a booking covers based on start slot and duration
+ * Start times you allow for a given date + duration.
+ * Ensures the session ends before closing and doesn't cross break.
+ */
+export function getStartSlotsForDate(
+  ymd: string,
+  durationMinutes: number,
+): string[] {
+  const dow = dayOfWeekFromYmd(ymd);
+
+  const makeRange = (startMin: number, endMin: number) => {
+    const lastStart = endMin - durationMinutes;
+    const out: string[] = [];
+    for (let t = startMin; t <= lastStart; t += SLOT_LENGTH_MINUTES) {
+      out.push(minutesToTime(t));
+    }
+    return out;
+  };
+
+  // Sunday
+  if (dow === 0) {
+    return makeRange(SUNDAY_OPEN, SUNDAY_CLOSE); // last start will be 17:30 for 60 mins
+  }
+
+  // Mon-Sat (two segments)
+  return [
+    ...makeRange(WEEKDAY_OPEN, WEEKDAY_BREAK_START), // last start becomes 16:30 for 60 mins
+    ...makeRange(WEEKDAY_BREAK_END, WEEKDAY_CLOSE), // last start becomes 20:00 for 60 mins
+  ];
+}
+
+export function isStartSlotAllowed(
+  ymd: string,
+  slot: string,
+  durationMinutes: number,
+): boolean {
+  const allowed = getStartSlotsForDate(ymd, durationMinutes);
+  return allowed.includes(slot);
+}
+
+/**
+ * Covered 15-min blocks for a booking starting at HH:MM
  */
 export function getSlotsForDuration(
   startSlot: string,
   durationMinutes: number,
 ): string[] {
-  const startIdx = SLOTS.indexOf(startSlot);
-  if (startIdx === -1) return [];
-  const count = durationToSlotCount(durationMinutes);
-  return SLOTS.slice(startIdx, startIdx + count);
+  const start = timeToMinutes(startSlot);
+  const count = Math.ceil(durationMinutes / SLOT_LENGTH_MINUTES);
+  const slots: string[] = [];
+  for (let i = 0; i < count; i++) {
+    slots.push(minutesToTime(start + i * SLOT_LENGTH_MINUTES));
+  }
+  return slots;
+}
+
+/**
+ * Calculate how many 15-min slots a duration occupies
+ */
+export function durationToSlotCount(durationMinutes: number): number {
+  return Math.ceil(durationMinutes / SLOT_LENGTH_MINUTES);
 }
 
 export function buildSlots(): string[] {

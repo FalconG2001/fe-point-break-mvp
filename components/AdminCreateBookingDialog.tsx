@@ -18,12 +18,13 @@ import {
 } from "@mui/material";
 import {
   CONSOLES,
-  SLOTS,
   DURATION_OPTIONS,
   DURATION_LABELS,
   type ConsoleId,
   type DurationMinutes,
   todayYmd,
+  isSlotPast,
+  getStartSlotsForDate,
 } from "@/lib/config";
 
 interface Props {
@@ -48,6 +49,17 @@ export default function AdminCreateBookingDialog({
   const [phone, setPhone] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
+
+  const slotOptions = React.useMemo(
+    () =>
+      getStartSlotsForDate(date, duration).filter((s) => !isSlotPast(date, s)),
+    [date, duration],
+  );
+
+  // if user changes date/duration and the chosen slot becomes invalid, clear it
+  React.useEffect(() => {
+    if (slot && !slotOptions.includes(slot)) setSlot("");
+  }, [slot, slotOptions]);
 
   // Reset form when dialog opens
   React.useEffect(() => {
@@ -95,7 +107,12 @@ export default function AdminCreateBookingDialog({
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Failed to create booking");
+        const detailError = data.details?.fieldErrors
+          ? (Object.values(data.details.fieldErrors).flat()[0] as string)
+          : null;
+        throw new Error(
+          detailError || data.error || "Failed to create booking",
+        );
       }
 
       onSuccess();
@@ -136,7 +153,7 @@ export default function AdminCreateBookingDialog({
               label="Time Slot"
               onChange={(e) => setSlot(e.target.value)}
             >
-              {SLOTS.map((s) => (
+              {slotOptions.map((s) => (
                 <MenuItem key={s} value={s}>
                   {s}
                 </MenuItem>

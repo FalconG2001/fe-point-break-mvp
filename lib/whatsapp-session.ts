@@ -16,9 +16,11 @@ export type SessionState =
 export interface WhatsAppSession {
   phoneNumber: string;
   state: SessionState;
+  // data shape
   data: {
     date?: string;
     slot?: string;
+    slotPage?: number; // ✅ add this
     consoleId?: string;
     customerName?: string;
     duration?: number;

@@ -20,13 +20,13 @@ import {
 import { getDb } from "@/lib/mongodb";
 import {
   CONSOLES,
-  SLOTS,
   TV_COUNT,
   type ConsoleId,
   todayYmd,
   isSlotPast,
   getSlotsForDuration,
   CENTRE_NAME,
+  getStartSlotsForDate,
 } from "@/lib/config";
 
 // Default duration for WhatsApp bookings (1 hour)
@@ -234,7 +234,8 @@ async function handleDateSelection(from: string, replyId: string) {
     return;
   }
 
-  await updateSession(from, "awaiting_slot", { date });
+  await updateSession(from, "awaiting_slot", { date, slotPage: 0 });
+  await sendSlotListPage(from, date, 0);
 
   // Group slots for better UX (show every 30 mins)
   const slotRows = availableSlots
@@ -263,6 +264,16 @@ async function handleSlotSelection(
   replyId: string,
   date: string,
 ) {
+  if (replyId.startsWith("slotnav_")) {
+    const page = Number(replyId.replace("slotnav_", ""));
+    if (!Number.isFinite(page) || page < 0) {
+      await sendTextMessage(from, "Please select a time from the list.");
+      return;
+    }
+    await sendSlotListPage(from, date, page);
+    return;
+  }
+
   if (!replyId.startsWith("slot_")) {
     await sendTextMessage(from, "Please select a time slot from the list.");
     return;
@@ -476,7 +487,10 @@ async function handleConfirmation(
 /**
  * Get availability for a date (reuses existing logic)
  */
-async function getAvailability(date: string) {
+async function getAvailability(
+  date: string,
+  durationMinutes: number = DEFAULT_DURATION,
+) {
   const db = await getDb();
   const bookings = await db
     .collection("bookings")
@@ -484,7 +498,7 @@ async function getAvailability(date: string) {
     .project({ _id: 0, slot: 1, selections: 1 })
     .toArray();
 
-  // Build slot -> booked consoles map
+  // Map 15-min slot -> booked consoleIds during that 15-min
   const bySlot = new Map<string, Set<ConsoleId>>();
 
   for (const b of bookings) {
@@ -494,29 +508,37 @@ async function getAvailability(date: string) {
     for (const s of sel) {
       if (!s?.consoleId) continue;
       const consoleId = s.consoleId as ConsoleId;
-      const duration = s.duration || 60;
-      const coveredSlots = getSlotsForDuration(startSlot, duration);
+      const dur = s.duration || 60;
 
-      for (const coveredSlot of coveredSlots) {
-        const set = bySlot.get(coveredSlot) ?? new Set<ConsoleId>();
+      const coveredSlots = getSlotsForDuration(startSlot, dur);
+      for (const covered of coveredSlots) {
+        const set = bySlot.get(covered) ?? new Set<ConsoleId>();
         set.add(consoleId);
-        bySlot.set(coveredSlot, set);
+        bySlot.set(covered, set);
       }
     }
   }
 
   const allIds = CONSOLES.map((c) => c.id) as ConsoleId[];
+  const startSlots = getStartSlotsForDate(date, durationMinutes);
 
-  return SLOTS.map((slot) => {
-    const isPast = isSlotPast(date, slot);
-    const booked = Array.from(bySlot.get(slot) ?? new Set<ConsoleId>());
-    const bookedCount = booked.length;
-    const tvRemaining = isPast ? 0 : Math.max(0, TV_COUNT - bookedCount);
+  return startSlots.map((start) => {
+    const isPast = isSlotPast(date, start);
+
+    // ✅ UNION booked consoles across the whole requested duration
+    const covered = getSlotsForDuration(start, durationMinutes);
+    const bookedSet = new Set<ConsoleId>();
+    for (const t of covered) {
+      for (const cid of bySlot.get(t) ?? []) bookedSet.add(cid);
+    }
+
+    const booked = Array.from(bookedSet);
+    const tvRemaining = isPast ? 0 : Math.max(0, TV_COUNT - booked.length);
     const availableConsoleIds =
-      tvRemaining <= 0 ? [] : allIds.filter((id) => !booked.includes(id));
+      tvRemaining <= 0 ? [] : allIds.filter((id) => !bookedSet.has(id));
 
     return {
-      slot,
+      slot: start,
       bookedConsoleIds: booked,
       availableConsoleIds,
       tvRemaining,
@@ -536,4 +558,55 @@ function formatDateDisplay(ymd: string): string {
     day: "numeric",
     weekday: "short",
   });
+}
+
+const SLOT_PAGE_SIZE = 8; // 8 times + prev/next = max 10 rows
+
+async function sendSlotListPage(from: string, date: string, page: number) {
+  const availability = await getAvailability(date, DEFAULT_DURATION);
+  const availableSlots = availability.filter(
+    (s) => !s.isPast && s.tvRemaining > 0,
+  );
+
+  const start = page * SLOT_PAGE_SIZE;
+  const pageItems = availableSlots.slice(start, start + SLOT_PAGE_SIZE);
+
+  const rows: Array<{ id: string; title: string; description?: string }> = [];
+
+  const hasPrev = page > 0;
+  const hasNext = start + SLOT_PAGE_SIZE < availableSlots.length;
+
+  if (hasPrev) {
+    rows.push({
+      id: `slotnav_${page - 1}`,
+      title: "⬅️ Back",
+      description: "Previous times",
+    });
+  }
+
+  rows.push(
+    ...pageItems.map((s) => ({
+      id: `slot_${s.slot}`,
+      title: s.slot,
+      description: `${s.tvRemaining} TV${s.tvRemaining > 1 ? "s" : ""} available`,
+    })),
+  );
+
+  if (hasNext) {
+    rows.push({
+      id: `slotnav_${page + 1}`,
+      title: "More times",
+      description: "Next options",
+    });
+  }
+
+  await mergeSessionData(from, { slotPage: page });
+
+  await sendListMessage(
+    from,
+    "Select Time Slot",
+    `📅 ${formatDateDisplay(date)}\n\nChoose your preferred time:\n\n(Send 'cancel' to start over)`,
+    "Select Time",
+    [{ title: "Available Slots", rows }],
+  );
 }
