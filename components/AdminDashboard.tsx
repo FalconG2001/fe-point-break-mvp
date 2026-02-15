@@ -21,6 +21,7 @@ import {
 import CancelIcon from "@mui/icons-material/Cancel";
 import RestoreIcon from "@mui/icons-material/Restore";
 import AddIcon from "@mui/icons-material/Add";
+import EditIcon from "@mui/icons-material/Edit";
 import { signOut } from "next-auth/react";
 import DateTabs from "./DateTabs";
 import { todayYmd, CONSOLES } from "@/lib/config";
@@ -59,6 +60,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = React.useState(false);
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
+  const [editingBooking, setEditingBooking] =
+    React.useState<AdminBooking | null>(null);
 
   async function load(d: string) {
     setLoading(true);
@@ -69,7 +72,7 @@ export default function AdminDashboard() {
       );
       const json = (await res.json()) as ApiResp;
       if (!res.ok) throw new Error(json.error || "Failed to load admin data");
-      console.log(json);
+      // console.log(json);
 
       setData(json);
     } catch (e: any) {
@@ -136,7 +139,10 @@ export default function AdminDashboard() {
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={() => setCreateDialogOpen(true)}
+              onClick={() => {
+                setEditingBooking(null);
+                setCreateDialogOpen(true);
+              }}
               sx={{
                 borderRadius: 1,
                 px: 3,
@@ -450,6 +456,23 @@ export default function AdminDashboard() {
                               </IconButton>
                             </Tooltip>
                           )}
+                          <Tooltip title="Edit">
+                            <IconButton
+                              onClick={() => {
+                                setEditingBooking(b);
+                                setCreateDialogOpen(true);
+                              }}
+                              disabled={actionLoading === b.id}
+                              sx={{
+                                borderRadius: 0.5,
+                                p: 0.5,
+                                opacity: 0.7,
+                                "&:hover": { opacity: 1 },
+                              }}
+                            >
+                              <EditIcon sx={{ fontSize: "1.2rem" }} />
+                            </IconButton>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -462,9 +485,13 @@ export default function AdminDashboard() {
 
         <AdminCreateBookingDialog
           open={createDialogOpen}
-          onClose={() => setCreateDialogOpen(false)}
+          onClose={() => {
+            setCreateDialogOpen(false);
+            setEditingBooking(null);
+          }}
           onSuccess={() => load(date)}
           defaultDate={date}
+          initialData={editingBooking || undefined}
         />
       </Stack>
     </Container>

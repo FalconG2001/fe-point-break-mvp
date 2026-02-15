@@ -23,7 +23,6 @@ import {
   type ConsoleId,
   type DurationMinutes,
   todayYmd,
-  isSlotPast,
   getStartSlotsForDate,
 } from "@/lib/config";
 
@@ -32,6 +31,17 @@ interface Props {
   onClose: () => void;
   onSuccess: () => void;
   defaultDate?: string;
+  initialData?: {
+    id: string;
+    date: string;
+    slot: string;
+    selections: Array<{
+      consoleId: string;
+      duration: number;
+      players: number;
+    }>;
+    customer: { name: string; phone: string };
+  };
 }
 
 export default function AdminCreateBookingDialog({
@@ -39,6 +49,7 @@ export default function AdminCreateBookingDialog({
   onClose,
   onSuccess,
   defaultDate,
+  initialData,
 }: Props) {
   const [date, setDate] = React.useState(defaultDate || todayYmd(0));
   const [slot, setSlot] = React.useState("");
@@ -50,9 +61,10 @@ export default function AdminCreateBookingDialog({
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
 
+  const isEdit = !!initialData;
+
   const slotOptions = React.useMemo(
-    () =>
-      getStartSlotsForDate(date, duration).filter((s) => !isSlotPast(date, s)),
+    () => getStartSlotsForDate(date, duration),
     [date, duration],
   );
 
@@ -61,19 +73,32 @@ export default function AdminCreateBookingDialog({
     if (slot && !slotOptions.includes(slot)) setSlot("");
   }, [slot, slotOptions]);
 
-  // Reset form when dialog opens
+  // Reset/Initialize form when dialog opens
   React.useEffect(() => {
     if (open) {
-      setDate(defaultDate || todayYmd(0));
-      setSlot("");
-      setConsoleId("");
-      setDuration(60);
-      setPlayers(1);
-      setName("");
-      setPhone("");
+      if (initialData) {
+        setDate(initialData.date);
+        setSlot(initialData.slot);
+        const sel = initialData.selections?.[0];
+        if (sel) {
+          setConsoleId(sel.consoleId as ConsoleId);
+          setDuration(sel.duration as DurationMinutes);
+          setPlayers(sel.players);
+        }
+        setName(initialData.customer?.name || "");
+        setPhone(initialData.customer?.phone || "");
+      } else {
+        setDate(defaultDate || todayYmd(0));
+        setSlot("");
+        setConsoleId("");
+        setDuration(60);
+        setPlayers(1);
+        setName("");
+        setPhone("");
+      }
       setError("");
     }
-  }, [open, defaultDate]);
+  }, [open, defaultDate, initialData]);
 
   const dates = [
     { value: todayYmd(0), label: "Today" },
@@ -91,17 +116,20 @@ export default function AdminCreateBookingDialog({
     setError("");
 
     try {
+      const payload = {
+        date,
+        slot,
+        selections: [{ consoleId, duration, players }],
+        name,
+        phone,
+        bookingFrom: "admin",
+        ...(isEdit ? { id: initialData?.id } : {}),
+      };
+
       const res = await fetch("/api/bookings", {
-        method: "POST",
+        method: isEdit ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date,
-          slot,
-          selections: [{ consoleId, duration, players }],
-          name,
-          phone,
-          bookingFrom: "admin",
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -111,14 +139,20 @@ export default function AdminCreateBookingDialog({
           ? (Object.values(data.details.fieldErrors).flat()[0] as string)
           : null;
         throw new Error(
-          detailError || data.error || "Failed to create booking",
+          detailError ||
+            data.error ||
+            `Failed to ${isEdit ? "update" : "create"} booking`,
         );
       }
 
       onSuccess();
       onClose();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to create booking");
+      setError(
+        e instanceof Error
+          ? e.message
+          : `Failed to ${isEdit ? "update" : "create"} booking`,
+      );
     } finally {
       setLoading(false);
     }
@@ -126,7 +160,9 @@ export default function AdminCreateBookingDialog({
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Create Walk-in Booking</DialogTitle>
+      <DialogTitle>
+        {isEdit ? "Edit Booking" : "Create Walk-in Booking"}
+      </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
@@ -227,7 +263,7 @@ export default function AdminCreateBookingDialog({
           disabled={loading}
           startIcon={loading ? <CircularProgress size={16} /> : null}
         >
-          Create Booking
+          {isEdit ? "Update Booking" : "Create Booking"}
         </Button>
       </DialogActions>
     </Dialog>

@@ -58,7 +58,8 @@ export const CreateBookingSchema = z
   })
   .superRefine((val, ctx) => {
     // past slot guard
-    if (isSlotPast(val.date, val.slot)) {
+    const isAdmin = val.bookingFrom === "admin";
+    if (!isAdmin && isSlotPast(val.date, val.slot)) {
       ctx.addIssue({
         path: ["slot"],
         code: z.ZodIssueCode.custom,
@@ -78,3 +79,7 @@ export const CreateBookingSchema = z
       }
     }
   });
+
+export const UpdateBookingSchema = CreateBookingSchema.extend({
+  id: z.string().min(1),
+});
