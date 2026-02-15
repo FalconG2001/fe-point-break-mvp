@@ -41,6 +41,7 @@ interface Props {
       players: number;
     }>;
     customer: { name: string; phone: string };
+    payments?: Array<{ type: number; amount: number }>;
   };
 }
 
@@ -58,6 +59,8 @@ export default function AdminCreateBookingDialog({
   const [players, setPlayers] = React.useState(1);
   const [name, setName] = React.useState("");
   const [phone, setPhone] = React.useState("");
+  const [cashPaid, setCashPaid] = React.useState<number | "">("");
+  const [gpayPaid, setGpayPaid] = React.useState<number | "">("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
 
@@ -87,6 +90,10 @@ export default function AdminCreateBookingDialog({
         }
         setName(initialData.customer?.name || "");
         setPhone(initialData.customer?.phone || "");
+        const cashAmt = initialData.payments?.find((p) => p.type === 2)?.amount;
+        const gpayAmt = initialData.payments?.find((p) => p.type === 1)?.amount;
+        setCashPaid(cashAmt !== undefined ? cashAmt : "");
+        setGpayPaid(gpayAmt !== undefined ? gpayAmt : "");
       } else {
         setDate(defaultDate || todayYmd(0));
         setSlot("");
@@ -95,6 +102,8 @@ export default function AdminCreateBookingDialog({
         setPlayers(1);
         setName("");
         setPhone("");
+        setCashPaid("");
+        setGpayPaid("");
       }
       setError("");
     }
@@ -123,6 +132,14 @@ export default function AdminCreateBookingDialog({
         name,
         phone,
         bookingFrom: "admin",
+        payments: [
+          ...(cashPaid !== "" && Number(cashPaid) > 0
+            ? [{ type: 2, amount: Number(cashPaid) }]
+            : []),
+          ...(gpayPaid !== "" && Number(gpayPaid) > 0
+            ? [{ type: 1, amount: Number(gpayPaid) }]
+            : []),
+        ],
         ...(isEdit ? { id: initialData?.id } : {}),
       };
 
@@ -251,6 +268,29 @@ export default function AdminCreateBookingDialog({
             onChange={(e) => setPhone(e.target.value)}
             required
           />
+
+          <Stack direction="row" spacing={2}>
+            <TextField
+              size="small"
+              label="Cash Paid (₹)"
+              type="number"
+              value={cashPaid}
+              onChange={(e) =>
+                setCashPaid(e.target.value === "" ? "" : Number(e.target.value))
+              }
+              fullWidth
+            />
+            <TextField
+              size="small"
+              label="GPay Paid (₹)"
+              type="number"
+              value={gpayPaid}
+              onChange={(e) =>
+                setGpayPaid(e.target.value === "" ? "" : Number(e.target.value))
+              }
+              fullWidth
+            />
+          </Stack>
         </Stack>
       </DialogContent>
       <DialogActions>

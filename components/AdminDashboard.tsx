@@ -43,6 +43,7 @@ type AdminBooking = {
   confirmed: boolean;
   createdAt: string;
   bookingFrom?: "website" | "whatsapp" | "admin";
+  payments?: Array<{ type: number; amount: number }>;
 };
 
 type ApiResp = {
@@ -309,6 +310,17 @@ export default function AdminDashboard() {
                         PROX
                       </TableCell>
                       <TableCell
+                        align="right"
+                        sx={{
+                          fontWeight: 800,
+                          color: "text.secondary",
+                          fontSize: "0.7rem",
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        PAID
+                      </TableCell>
+                      <TableCell
                         align="center"
                         sx={{
                           fontWeight: 800,
@@ -421,6 +433,36 @@ export default function AdminDashboard() {
                               0,
                             )}
                           </Typography>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Stack alignItems="flex-end">
+                            <Typography
+                              variant="body2"
+                              fontWeight={800}
+                              sx={{ fontSize: "0.85rem" }}
+                            >
+                              ₹
+                              {b.payments?.reduce(
+                                (sum, p) => sum + p.amount,
+                                0,
+                              ) || 0}
+                            </Typography>
+                            {b.payments && b.payments.length > 0 && (
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ fontSize: "0.6rem" }}
+                              >
+                                {b.payments
+                                  .map((p) =>
+                                    p.type === 1
+                                      ? `G:${p.amount}`
+                                      : `C:${p.amount}`,
+                                  )
+                                  .join(", ")}
+                              </Typography>
+                            )}
+                          </Stack>
                         </TableCell>
                         <TableCell align="center">
                           {b.confirmed ? (

@@ -40,6 +40,14 @@ const SlotSchema = z
     return m % 15 === 0;
   }, "Slot must be in 15-min steps");
 
+export const PaymentSchema = z.object({
+  type: z
+    .number()
+    .int()
+    .refine((v) => [1, 2].includes(v), "Invalid payment type"), // 1: GPay, 2: Cash
+  amount: z.number().min(0),
+});
+
 export const CreateBookingSchema = z
   .object({
     date: z
@@ -55,6 +63,7 @@ export const CreateBookingSchema = z
       .max(20)
       .regex(/^[0-9+()\-\s]+$/),
     bookingFrom: BookingSourceSchema.optional().default("website"),
+    payments: z.array(PaymentSchema).optional(),
   })
   .superRefine((val, ctx) => {
     // past slot guard

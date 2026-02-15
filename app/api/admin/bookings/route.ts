@@ -49,6 +49,7 @@ export async function GET(req: Request) {
     })),
     customer: b.customer ?? { name: "", phone: "" },
     confirmed: b.confirmed !== false, // Default to true for legacy bookings
+    payments: b.payments || [],
     createdAt: b.createdAt,
     bookingFrom: b.bookingFrom,
   }));
