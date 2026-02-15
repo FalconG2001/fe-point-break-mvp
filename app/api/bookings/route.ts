@@ -24,8 +24,16 @@ export async function POST(req: Request) {
     );
   }
 
-  const { date, slot, selections, name, phone, bookingFrom, payments } =
-    parsed.data;
+  const {
+    date,
+    slot,
+    selections,
+    name,
+    phone,
+    bookingFrom,
+    payments,
+    totalPrice,
+  } = parsed.data;
 
   if (!isDateAllowed(date)) {
     return NextResponse.json({ error: "Date not allowed" }, { status: 400 });
@@ -161,6 +169,7 @@ export async function POST(req: Request) {
     confirmed: true, // New bookings are confirmed by default
     bookingFrom,
     payments: payments || [],
+    totalPrice: totalPrice || 0,
     createdAt: new Date().toISOString(),
   };
 
@@ -191,8 +200,17 @@ export async function PATCH(req: Request) {
     );
   }
 
-  const { id, date, slot, selections, name, phone, bookingFrom, payments } =
-    parsed.data;
+  const {
+    id,
+    date,
+    slot,
+    selections,
+    name,
+    phone,
+    bookingFrom,
+    payments,
+    totalPrice,
+  } = parsed.data;
 
   let objectId: ObjectId;
   try {
@@ -315,6 +333,7 @@ export async function PATCH(req: Request) {
       customer: { name, phone },
       bookingFrom,
       payments: payments || [],
+      totalPrice: totalPrice !== undefined ? totalPrice : undefined,
       updatedAt: new Date().toISOString(),
     },
   };

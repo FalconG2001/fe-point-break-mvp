@@ -59,11 +59,14 @@ export const CreateBookingSchema = z
     name: z.string().min(2).max(60),
     phone: z
       .string()
-      .min(7)
+      .min(0)
       .max(20)
-      .regex(/^[0-9+()\-\s]+$/),
+      .regex(/^[0-9+()\-\s]*$/)
+      .optional()
+      .or(z.literal("")),
     bookingFrom: BookingSourceSchema.optional().default("website"),
     payments: z.array(PaymentSchema).optional(),
+    totalPrice: z.number().min(0).optional(),
   })
   .superRefine((val, ctx) => {
     // past slot guard

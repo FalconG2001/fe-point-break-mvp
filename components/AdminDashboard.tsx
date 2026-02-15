@@ -32,6 +32,7 @@ type SelectionWithDuration = {
   players: number;
   duration: number;
   durationLabel: string;
+  endTime: string;
 };
 
 type AdminBooking = {
@@ -44,6 +45,7 @@ type AdminBooking = {
   createdAt: string;
   bookingFrom?: "website" | "whatsapp" | "admin";
   payments?: Array<{ type: number; amount: number }>;
+  totalPrice?: number;
 };
 
 type ApiResp = {
@@ -51,6 +53,9 @@ type ApiResp = {
   totalBookings: number;
   totalConsolesBooked: number;
   totalPlayers: number;
+  grandTotalPaid: number;
+  grandTotalDue: number;
+  lastSlotEnding: string;
   bookings: AdminBooking[];
   error?: string;
 };
@@ -82,6 +87,9 @@ export default function AdminDashboard() {
         totalBookings: 0,
         totalConsolesBooked: 0,
         totalPlayers: 0,
+        grandTotalPaid: 0,
+        grandTotalDue: 0,
+        lastSlotEnding: "",
         bookings: [],
         error: e?.message || "Failed",
       });
@@ -180,8 +188,23 @@ export default function AdminDashboard() {
                 color: "#71717a",
               },
               { label: "Players", value: data.totalPlayers, color: "#a1a1aa" },
+              {
+                label: "Last Slot",
+                value: data.lastSlotEnding || "—",
+                color: "#f43f5e",
+              },
+              {
+                label: "Paid",
+                value: `₹${data.grandTotalPaid}`,
+                color: "#10b981",
+              },
+              {
+                label: "Due",
+                value: `₹${data.grandTotalDue}`,
+                color: "#f59e0b",
+              },
             ].map((stat, i) => (
-              <Grid key={i} size={{ xs: 12, sm: 4 }}>
+              <Grid key={i} size={{ xs: 6, sm: 4, md: 2 }}>
                 <Paper
                   sx={{
                     p: 2.5,
@@ -276,7 +299,17 @@ export default function AdminDashboard() {
                           letterSpacing: "0.05em",
                         }}
                       >
-                        TIME
+                        START
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          fontWeight: 800,
+                          color: "text.secondary",
+                          fontSize: "0.7rem",
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        END
                       </TableCell>
                       <TableCell
                         sx={{
@@ -318,7 +351,18 @@ export default function AdminDashboard() {
                           letterSpacing: "0.05em",
                         }}
                       >
-                        PAID
+                        PAID / TOTAL
+                      </TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          fontWeight: 800,
+                          color: "text.secondary",
+                          fontSize: "0.7rem",
+                          letterSpacing: "0.05em",
+                        }}
+                      >
+                        DUE
                       </TableCell>
                       <TableCell
                         align="center"
@@ -387,6 +431,18 @@ export default function AdminDashboard() {
                           </Typography>
                         </TableCell>
                         <TableCell>
+                          <Typography
+                            variant="body2"
+                            fontWeight={800}
+                            sx={{
+                              fontSize: "0.85rem",
+                              color: "text.secondary",
+                            }}
+                          >
+                            {b.selections[0]?.endTime || b.slot}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
                           <Stack>
                             <Typography
                               variant="body2"
@@ -445,7 +501,8 @@ export default function AdminDashboard() {
                               {b.payments?.reduce(
                                 (sum, p) => sum + p.amount,
                                 0,
-                              ) || 0}
+                              ) || 0}{" "}
+                              / ₹{b.totalPrice || 0}
                             </Typography>
                             {b.payments && b.payments.length > 0 && (
                               <Typography
@@ -463,6 +520,34 @@ export default function AdminDashboard() {
                               </Typography>
                             )}
                           </Stack>
+                        </TableCell>
+                        <TableCell align="right">
+                          <Typography
+                            variant="body2"
+                            fontWeight={800}
+                            sx={{
+                              fontSize: "0.85rem",
+                              color:
+                                (b.totalPrice || 0) -
+                                  (b.payments?.reduce(
+                                    (sum, p) => sum + p.amount,
+                                    0,
+                                  ) || 0) >
+                                0
+                                  ? "#f59e0b"
+                                  : "text.secondary",
+                            }}
+                          >
+                            ₹
+                            {Math.max(
+                              0,
+                              (b.totalPrice || 0) -
+                                (b.payments?.reduce(
+                                  (sum, p) => sum + p.amount,
+                                  0,
+                                ) || 0),
+                            )}
+                          </Typography>
                         </TableCell>
                         <TableCell align="center">
                           {b.confirmed ? (

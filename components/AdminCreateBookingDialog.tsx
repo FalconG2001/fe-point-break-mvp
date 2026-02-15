@@ -42,6 +42,7 @@ interface Props {
     }>;
     customer: { name: string; phone: string };
     payments?: Array<{ type: number; amount: number }>;
+    totalPrice?: number;
   };
 }
 
@@ -59,6 +60,7 @@ export default function AdminCreateBookingDialog({
   const [players, setPlayers] = React.useState(1);
   const [name, setName] = React.useState("");
   const [phone, setPhone] = React.useState("");
+  const [totalPrice, setTotalPrice] = React.useState<number | "">("");
   const [cashPaid, setCashPaid] = React.useState<number | "">("");
   const [gpayPaid, setGpayPaid] = React.useState<number | "">("");
   const [loading, setLoading] = React.useState(false);
@@ -90,6 +92,9 @@ export default function AdminCreateBookingDialog({
         }
         setName(initialData.customer?.name || "");
         setPhone(initialData.customer?.phone || "");
+        setTotalPrice(
+          initialData.totalPrice !== undefined ? initialData.totalPrice : "",
+        );
         const cashAmt = initialData.payments?.find((p) => p.type === 2)?.amount;
         const gpayAmt = initialData.payments?.find((p) => p.type === 1)?.amount;
         setCashPaid(cashAmt !== undefined ? cashAmt : "");
@@ -102,6 +107,7 @@ export default function AdminCreateBookingDialog({
         setPlayers(1);
         setName("");
         setPhone("");
+        setTotalPrice("");
         setCashPaid("");
         setGpayPaid("");
       }
@@ -116,8 +122,8 @@ export default function AdminCreateBookingDialog({
   ];
 
   const handleSubmit = async () => {
-    if (!slot || !consoleId || !name || !phone) {
-      setError("Please fill in all fields");
+    if (!slot || !consoleId || !name) {
+      setError("Please fill in name, slot and console");
       return;
     }
 
@@ -131,6 +137,7 @@ export default function AdminCreateBookingDialog({
         selections: [{ consoleId, duration, players }],
         name,
         phone,
+        totalPrice: totalPrice === "" ? 0 : Number(totalPrice),
         bookingFrom: "admin",
         payments: [
           ...(cashPaid !== "" && Number(cashPaid) > 0
@@ -266,6 +273,16 @@ export default function AdminCreateBookingDialog({
             label="Phone Number"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
+          />
+
+          <TextField
+            size="small"
+            label="Total Price (₹)"
+            type="number"
+            value={totalPrice}
+            onChange={(e) =>
+              setTotalPrice(e.target.value === "" ? "" : Number(e.target.value))
+            }
             required
           />
 
