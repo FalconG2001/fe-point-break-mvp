@@ -17,6 +17,11 @@ import {
   IconButton,
   Tooltip,
   Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from "@mui/material";
 import CancelIcon from "@mui/icons-material/Cancel";
 import RestoreIcon from "@mui/icons-material/Restore";
@@ -68,6 +73,10 @@ export default function AdminDashboard() {
   const [createDialogOpen, setCreateDialogOpen] = React.useState(false);
   const [editingBooking, setEditingBooking] =
     React.useState<AdminBooking | null>(null);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = React.useState(false);
+  const [bookingToCancel, setBookingToCancel] = React.useState<string | null>(
+    null,
+  );
 
   async function load(d: string) {
     setLoading(true);
@@ -554,7 +563,10 @@ export default function AdminDashboard() {
                             <Tooltip title="Void">
                               <IconButton
                                 color="error"
-                                onClick={() => toggleConfirmed(b.id, false)}
+                                onClick={() => {
+                                  setBookingToCancel(b.id);
+                                  setCancelConfirmOpen(true);
+                                }}
                                 disabled={actionLoading === b.id}
                                 sx={{
                                   borderRadius: 0.5,
@@ -620,6 +632,46 @@ export default function AdminDashboard() {
           defaultDate={date}
           initialData={editingBooking || undefined}
         />
+
+        <Dialog
+          open={cancelConfirmOpen}
+          onClose={() => setCancelConfirmOpen(false)}
+          PaperProps={{
+            sx: { borderRadius: 1, p: 1 },
+          }}
+        >
+          <DialogTitle sx={{ fontWeight: 900 }}>
+            Confirm Cancellation
+          </DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to void this booking? This action can be
+              undone later by restoring the booking.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions sx={{ p: 2, pt: 0 }}>
+            <Button
+              onClick={() => setCancelConfirmOpen(false)}
+              sx={{ color: "text.secondary", fontWeight: 700 }}
+            >
+              No, Keep it
+            </Button>
+            <Button
+              onClick={() => {
+                if (bookingToCancel) {
+                  toggleConfirmed(bookingToCancel, false);
+                }
+                setCancelConfirmOpen(false);
+                setBookingToCancel(null);
+              }}
+              variant="contained"
+              color="error"
+              sx={{ borderRadius: 1, fontWeight: 700, px: 3 }}
+            >
+              Yes, Cancel
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Stack>
     </Container>
   );
