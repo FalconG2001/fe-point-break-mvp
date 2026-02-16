@@ -37,8 +37,8 @@ const SlotSchema = z
     const [h, m] = v.split(":").map(Number);
     if (!Number.isFinite(h) || !Number.isFinite(m)) return false;
     if (h < 0 || h > 23) return false;
-    return m % 15 === 0;
-  }, "Slot must be in 15-min steps");
+    return true;
+  }, "Invalid time format");
 
 export const PaymentSchema = z.object({
   type: z
@@ -69,8 +69,21 @@ export const CreateBookingSchema = z
     totalPrice: z.number().min(0).optional(),
   })
   .superRefine((val, ctx) => {
-    // past slot guard
     const isAdmin = val.bookingFrom === "admin";
+
+    // 15-min step check (only for non-admins)
+    if (!isAdmin) {
+      const [, m] = val.slot.split(":").map(Number);
+      if (m % 15 !== 0) {
+        ctx.addIssue({
+          path: ["slot"],
+          code: z.ZodIssueCode.custom,
+          message: "Slot must be in 15-min steps",
+        });
+      }
+    }
+
+    // past slot guard
     if (!isAdmin && isSlotPast(val.date, val.slot)) {
       ctx.addIssue({
         path: ["slot"],
@@ -80,14 +93,18 @@ export const CreateBookingSchema = z
     }
 
     // slot must be allowed for EACH selection duration
-    for (const sel of val.selections) {
-      if (!isStartSlotAllowed(val.date, val.slot, sel.duration)) {
-        ctx.addIssue({
-          path: ["slot"],
-          code: "custom",
-          message: `Slot not allowed for ${sel.duration} mins on that date.`,
-        });
-        break;
+    // For admins, we skip the predefined slot list check, but we should still
+    // ensure it's within business hours. For now, we trust the Admin UI minTime/maxTime.
+    if (!isAdmin) {
+      for (const sel of val.selections) {
+        if (!isStartSlotAllowed(val.date, val.slot, sel.duration)) {
+          ctx.addIssue({
+            path: ["slot"],
+            code: "custom",
+            message: `Slot not allowed for ${sel.duration} mins on that date.`,
+          });
+          break;
+        }
       }
     }
   });

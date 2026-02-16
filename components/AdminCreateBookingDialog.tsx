@@ -16,6 +16,10 @@ import {
   Alert,
   CircularProgress,
 } from "@mui/material";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { TimePicker } from "@mui/x-date-pickers/TimePicker";
+import dayjs, { Dayjs } from "dayjs";
 import {
   CONSOLES,
   DURATION_OPTIONS,
@@ -68,15 +72,12 @@ export default function AdminCreateBookingDialog({
 
   const isEdit = !!initialData;
 
-  const slotOptions = React.useMemo(
-    () => getStartSlotsForDate(date, duration),
-    [date, duration],
-  );
+  // No longer need slotOptions for filtering slots in UI,
+  // but we still use it for legacy purposes or internal logic if needed.
+  // The user can now pick any time.
 
-  // if user changes date/duration and the chosen slot becomes invalid, clear it
-  React.useEffect(() => {
-    if (slot && !slotOptions.includes(slot)) setSlot("");
-  }, [slot, slotOptions]);
+  // if user changes date/duration, we just keep the slot as is.
+  // The backend will validate conflicts.
 
   // Reset/Initialize form when dialog opens
   React.useEffect(() => {
@@ -101,7 +102,7 @@ export default function AdminCreateBookingDialog({
         setGpayPaid(gpayAmt !== undefined ? gpayAmt : "");
       } else {
         setDate(defaultDate || todayYmd(0));
-        setSlot("");
+        setSlot("10:00");
         setConsoleId("");
         setDuration(60);
         setPlayers(1);
@@ -206,20 +207,25 @@ export default function AdminCreateBookingDialog({
             </Select>
           </FormControl>
 
-          <FormControl fullWidth size="small">
-            <InputLabel>Time Slot</InputLabel>
-            <Select
-              value={slot}
-              label="Time Slot"
-              onChange={(e) => setSlot(e.target.value)}
-            >
-              {slotOptions.map((s) => (
-                <MenuItem key={s} value={s}>
-                  {s}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <TimePicker
+              label="Start Time"
+              value={slot ? dayjs(`${date}T${slot}`) : null}
+              onChange={(newValue: Dayjs | null) => {
+                if (newValue) {
+                  setSlot(newValue.format("HH:mm"));
+                }
+              }}
+              slotProps={{
+                textField: {
+                  size: "small",
+                  fullWidth: true,
+                },
+              }}
+              minTime={dayjs(`${date}T10:00`)}
+              maxTime={dayjs(`${date}T21:00`)}
+            />
+          </LocalizationProvider>
 
           <FormControl fullWidth size="small">
             <InputLabel>Console</InputLabel>

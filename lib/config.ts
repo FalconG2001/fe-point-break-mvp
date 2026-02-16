@@ -125,16 +125,27 @@ export function isStartSlotAllowed(
 
 /**
  * Covered 15-min blocks for a booking starting at HH:MM
+ * If start time is not on a 15-min boundary, we include the 15-min block it falls into.
+ * Example: 10:07 for 60 mins covers 10:00, 10:15, 10:30, 10:45, 11:00.
  */
 export function getSlotsForDuration(
   startSlot: string,
   durationMinutes: number,
 ): string[] {
-  const start = timeToMinutes(startSlot);
-  const count = Math.ceil(durationMinutes / SLOT_LENGTH_MINUTES);
+  const startTotalMinutes = timeToMinutes(startSlot);
+  const endTotalMinutes = startTotalMinutes + durationMinutes;
+
+  // Find the first 15-min boundary <= startTotalMinutes
+  const firstSlotMinutes =
+    Math.floor(startTotalMinutes / SLOT_LENGTH_MINUTES) * SLOT_LENGTH_MINUTES;
+
   const slots: string[] = [];
-  for (let i = 0; i < count; i++) {
-    slots.push(minutesToTime(start + i * SLOT_LENGTH_MINUTES));
+  for (
+    let t = firstSlotMinutes;
+    t < endTotalMinutes;
+    t += SLOT_LENGTH_MINUTES
+  ) {
+    slots.push(minutesToTime(t));
   }
   return slots;
 }
