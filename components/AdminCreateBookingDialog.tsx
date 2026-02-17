@@ -19,6 +19,7 @@ import {
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { TimePicker } from "@mui/x-date-pickers/TimePicker";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import dayjs, { Dayjs } from "dayjs";
 import {
   CONSOLES,
@@ -116,12 +117,6 @@ export default function AdminCreateBookingDialog({
     }
   }, [open, defaultDate, initialData]);
 
-  const dates = [
-    { value: todayYmd(0), label: "Today" },
-    { value: todayYmd(1), label: "Tomorrow" },
-    { value: todayYmd(2), label: "Day After" },
-  ];
-
   const handleSubmit = async () => {
     if (!slot || !consoleId || !name) {
       setError("Please fill in name, slot and console");
@@ -192,22 +187,23 @@ export default function AdminCreateBookingDialog({
         <Stack spacing={2} sx={{ mt: 1 }}>
           {error && <Alert severity="error">{error}</Alert>}
 
-          <FormControl fullWidth size="small">
-            <InputLabel>Date</InputLabel>
-            <Select
-              value={date}
-              label="Date"
-              onChange={(e) => setDate(e.target.value)}
-            >
-              {dates.map((d) => (
-                <MenuItem key={d.value} value={d.value}>
-                  {d.label} ({d.value})
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-
           <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <DatePicker
+              label="Date"
+              value={dayjs(date)}
+              onChange={(newValue: Dayjs | null) => {
+                if (newValue) {
+                  setDate(newValue.format("YYYY-MM-DD"));
+                }
+              }}
+              slotProps={{
+                textField: {
+                  size: "small",
+                  fullWidth: true,
+                },
+              }}
+            />
+
             <TimePicker
               label="Start Time"
               value={slot ? dayjs(`${date}T${slot}`) : null}

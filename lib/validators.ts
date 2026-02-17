@@ -50,10 +50,7 @@ export const PaymentSchema = z.object({
 
 export const CreateBookingSchema = z
   .object({
-    date: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/)
-      .refine(isDateAllowed),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     slot: SlotSchema,
     selections: z.array(BookingSelectionSchema).min(1),
     name: z.string().min(2).max(60),
@@ -70,6 +67,15 @@ export const CreateBookingSchema = z
   })
   .superRefine((val, ctx) => {
     const isAdmin = val.bookingFrom === "admin";
+
+    // Date range check
+    if (!isAdmin && !isDateAllowed(val.date)) {
+      ctx.addIssue({
+        path: ["date"],
+        code: z.ZodIssueCode.custom,
+        message: "Date not allowed",
+      });
+    }
 
     // 15-min step check (only for non-admins)
     if (!isAdmin) {

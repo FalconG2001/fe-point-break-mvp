@@ -1,18 +1,9 @@
 "use client";
 
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  Button,
-} from "@mui/material";
 import * as React from "react";
 import {
   Stack,
   Typography,
-  Alert,
   Paper,
   Table,
   TableHead,
@@ -23,24 +14,45 @@ import {
   IconButton,
   Tooltip,
   Grid,
+  TextField,
+  TablePagination,
+  Box,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
 } from "@mui/material";
-import dayjs from "dayjs";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import dayjs, { Dayjs } from "dayjs";
+import SearchIcon from "@mui/icons-material/Search";
 import CancelIcon from "@mui/icons-material/Cancel";
 import RestoreIcon from "@mui/icons-material/Restore";
 import EditIcon from "@mui/icons-material/Edit";
 import { todayYmd } from "@/lib/config";
-import DateTabs from "./DateTabs";
-import AdminCreateBookingDialog from "./AdminCreateBookingDialog";
 import { AdminBooking, ApiResp, consoleName } from "@/lib/types";
+import AdminCreateBookingDialog from "./AdminCreateBookingDialog";
 import { useAdmin } from "./AdminContext";
 
-export default function AdminDashboard() {
-  const [date, setDate] = React.useState(todayYmd(0));
+interface AllBookingsProps {
+  onSuccess?: () => void;
+}
+
+export default function AllBookings({ onSuccess }: AllBookingsProps) {
+  const { isCreateBookingOpen, setCreateBookingOpen, refreshTrigger } =
+    useAdmin();
+  const [rangeStart, setRangeStart] = React.useState<Dayjs | null>(null);
+  const [rangeEnd, setRangeEnd] = React.useState<Dayjs | null>(null);
+  const [searchName, setSearchName] = React.useState("");
   const [data, setData] = React.useState<ApiResp | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
-  const { isCreateBookingOpen, setCreateBookingOpen, refreshTrigger } =
-    useAdmin();
+  const [page, setPage] = React.useState(0);
+  const [rowsPerPage, setRowsPerPage] = React.useState(10);
+
   const [editingBooking, setEditingBooking] =
     React.useState<AdminBooking | null>(null);
   const [cancelConfirmOpen, setCancelConfirmOpen] = React.useState(false);
@@ -52,19 +64,22 @@ export default function AdminDashboard() {
     null,
   );
 
-  async function load(d: string) {
-    setLoading(true);
-    setData(null);
-    try {
-      const res = await fetch(
-        `/api/admin/bookings?date=${encodeURIComponent(d)}`,
-      );
-      const json = (await res.json()) as ApiResp;
-      if (!res.ok) throw new Error(json.error || "Failed to load admin data");
-      setData(json);
-    } catch (e: any) {
+  async function load() {
+    const sYmd = rangeStart?.format("YYYY-MM-DD");
+    const eYmd = rangeEnd?.format("YYYY-MM-DD");
+
+    // Exclusion rule: today, tomorrow, dayAfter
+    const t0 = todayYmd(0);
+    const t1 = todayYmd(1);
+    const t2 = todayYmd(2);
+    const allowedSet = [t0, t1, t2];
+
+    const isStartAllowed = sYmd && allowedSet.includes(sYmd);
+    const isEndAllowed = eYmd && allowedSet.includes(eYmd);
+
+    if (sYmd && eYmd && isStartAllowed && isEndAllowed) {
       setData({
-        date: d,
+        date: `${sYmd} to ${eYmd}`,
         totalBookings: 0,
         totalConsolesBooked: 0,
         totalPlayers: 0,
@@ -72,12 +87,34 @@ export default function AdminDashboard() {
         grandTotalDue: 0,
         lastSlotEnding: "",
         bookings: [],
-        error: e?.message || "Failed",
       });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: (page + 1).toString(),
+        limit: rowsPerPage.toString(),
+      });
+      if (sYmd) params.append("startDate", sYmd);
+      if (eYmd) params.append("endDate", eYmd);
+      if (searchName) params.append("searchName", searchName);
+
+      const res = await fetch(`/api/admin/bookings?${params.toString()}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed");
+      setData(json);
+    } catch (e: any) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
   }
+
+  React.useEffect(() => {
+    load();
+  }, [rangeStart, rangeEnd, searchName, page, rowsPerPage, refreshTrigger]);
 
   async function toggleConfirmed(bookingId: string, newConfirmed: boolean) {
     setActionLoading(bookingId);
@@ -87,127 +124,116 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingId, confirmed: newConfirmed }),
       });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.error || "Failed to update booking");
-      }
-      await load(date);
+      if (!res.ok) throw new Error("Update failed");
+      await load();
+      if (onSuccess) onSuccess();
     } catch (e: any) {
-      alert(e?.message || "Failed to update");
+      alert(e.message);
     } finally {
       setActionLoading(null);
     }
   }
 
-  React.useEffect(() => {
-    load(date);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, refreshTrigger]);
-
   return (
-    <Stack spacing={4}>
-      <DateTabs value={date} onChange={setDate} />
+    <Box>
+      <Stack spacing={4}>
+        <Stack spacing={1}>
+          <Typography variant="h5" fontWeight={900}>
+            Booking Archive & Search
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Search through all historical and future session records.
+          </Typography>
+        </Stack>
 
-      {!loading && data && !data.error && (
-        <Grid container spacing={2}>
-          {[
-            { label: "Active", value: data.totalBookings, color: "#000" },
-            {
-              label: "Consoles",
-              value: data.totalConsolesBooked,
-              color: "#71717a",
-            },
-            { label: "Players", value: data.totalPlayers, color: "#a1a1aa" },
-            {
-              label: "Last Slot",
-              value: data.lastSlotEnding || "—",
-              color: "#f43f5e",
-            },
-            {
-              label: "Paid",
-              value: `₹${data.grandTotalPaid}`,
-              color: "#10b981",
-            },
-            {
-              label: "Due",
-              value: `₹${data.grandTotalDue}`,
-              color: "#f59e0b",
-            },
-          ].map((stat, i) => (
-            <Grid key={i} size={{ xs: 6, sm: 4, md: 2 }}>
-              <Paper
-                sx={{
-                  p: 2.5,
-                  borderRadius: 1,
-                  background: "#ffffff",
-                  border: "1px solid rgba(0, 0, 0, 0.08)",
-                  borderLeft: `2px solid ${stat.color}`,
-                  display: "flex",
-                  flexDirection: "column",
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.02)",
+        <LocalizationProvider dateAdapter={AdapterDayjs}>
+          <Grid container spacing={2} alignItems="center">
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                size="small"
+                fullWidth
+                placeholder="Search by customer name..."
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <SearchIcon
+                        sx={{
+                          color: "text.secondary",
+                          mr: 1,
+                          fontSize: "1.1rem",
+                        }}
+                      />
+                    ),
+                  },
                 }}
-              >
-                <Typography
-                  variant="caption"
-                  fontWeight={700}
-                  color="text.secondary"
-                  sx={{ textTransform: "uppercase", fontSize: "0.65rem" }}
-                >
-                  {stat.label}
-                </Typography>
-                <Typography variant="h4" fontWeight={900} sx={{ mt: 0.5 }}>
-                  {stat.value}
-                </Typography>
-              </Paper>
+              />
             </Grid>
-          ))}
-        </Grid>
-      )}
+            <Grid size={{ xs: 12, sm: 3 }}>
+              <DatePicker
+                label="Start Date"
+                value={rangeStart}
+                onChange={(newValue) => setRangeStart(newValue)}
+                slotProps={{
+                  textField: { size: "small", fullWidth: true },
+                  field: { clearable: true },
+                }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 3 }}>
+              <DatePicker
+                label="End Date"
+                value={rangeEnd}
+                onChange={(newValue) => setRangeEnd(newValue)}
+                slotProps={{
+                  textField: { size: "small", fullWidth: true },
+                  field: { clearable: true },
+                }}
+              />
+            </Grid>
+          </Grid>
+        </LocalizationProvider>
 
-      <Paper
-        className="glass-panel"
-        elevation={0}
-        sx={{
-          p: { xs: 0, sm: 1 },
-          borderRadius: 1,
-          background: "rgba(255, 255, 255, 0.5)",
-          border: "1px solid rgba(0, 0, 0, 0.08)",
-          overflowX: "auto",
-        }}
-      >
-        {loading && (
-          <Stack sx={{ p: 8, textAlign: "center" }}>
-            <Typography variant="body2" color="text.secondary">
-              Accessing mainframe...
-            </Typography>
-          </Stack>
-        )}
-
-        {!loading && data?.error && (
-          <Alert severity="error" sx={{ m: 3, borderRadius: 1 }}>
-            {data.error}
-          </Alert>
-        )}
-
-        {!loading && data && !data.error && (
-          <Stack spacing={0}>
-            {data.bookings.length === 0 ? (
-              <Stack sx={{ p: 8, textAlign: "center" }}>
-                <Typography variant="body2" color="text.secondary">
-                  No bookings detected.
-                </Typography>
-              </Stack>
-            ) : (
+        <Paper
+          className="glass-panel"
+          elevation={0}
+          sx={{
+            p: { xs: 0, sm: 1 },
+            borderRadius: 1,
+            background: "rgba(255, 255, 255, 0.5)",
+            border: "1px solid rgba(0, 0, 0, 0.08)",
+            overflowX: "auto",
+          }}
+        >
+          {loading ? (
+            <Stack sx={{ p: 8, textAlign: "center" }}>
+              <Typography variant="body2" color="text.secondary">
+                Retrieving data...
+              </Typography>
+            </Stack>
+          ) : !data || data.bookings.length === 0 ? (
+            <Stack sx={{ p: 8, textAlign: "center" }}>
+              <Typography variant="body2" color="text.secondary">
+                No matching records found outside the current cycle.
+              </Typography>
+            </Stack>
+          ) : (
+            <>
               <Table sx={{ minWidth: 800 }}>
                 <TableHead>
                   <TableRow sx={{ background: "rgba(0, 0, 0, 0.02)" }}>
                     {[
+                      "DATE",
                       "STATUS",
                       "SRC",
                       "START",
                       "END",
                       "CUSTOMER",
                       "CONSOLES",
+                      "PROX",
+                      "PAID / TOTAL",
+                      "DUE",
                     ].map((h) => (
                       <TableCell
                         key={h}
@@ -221,39 +247,6 @@ export default function AdminDashboard() {
                         {h}
                       </TableCell>
                     ))}
-                    <TableCell
-                      align="right"
-                      sx={{
-                        fontWeight: 800,
-                        color: "text.secondary",
-                        fontSize: "0.7rem",
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      PROX
-                    </TableCell>
-                    <TableCell
-                      align="right"
-                      sx={{
-                        fontWeight: 800,
-                        color: "text.secondary",
-                        fontSize: "0.7rem",
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      PAID / TOTAL
-                    </TableCell>
-                    <TableCell
-                      align="right"
-                      sx={{
-                        fontWeight: 800,
-                        color: "text.secondary",
-                        fontSize: "0.7rem",
-                        letterSpacing: "0.05em",
-                      }}
-                    >
-                      DUE
-                    </TableCell>
                     <TableCell
                       align="center"
                       sx={{
@@ -271,17 +264,17 @@ export default function AdminDashboard() {
                   {data.bookings.map((b) => (
                     <TableRow
                       key={b.id}
-                      sx={{
-                        opacity: b.confirmed ? 1 : 0.5,
-                        "&:hover": {
-                          backgroundColor: "rgba(0, 0, 0, 0.01)",
-                        },
-                        "& .MuiTableCell-root": {
-                          borderBottom: "1px solid rgba(0, 0, 0, 0.05)",
-                          py: 1.5,
-                        },
-                      }}
+                      sx={{ opacity: b.confirmed ? 1 : 0.5 }}
                     >
+                      <TableCell>
+                        <Typography
+                          variant="body2"
+                          fontWeight={800}
+                          sx={{ fontSize: "0.85rem" }}
+                        >
+                          {dayjs(b.date).format("DD MMM")}
+                        </Typography>
+                      </TableCell>
                       <TableCell>
                         <Chip
                           size="small"
@@ -355,7 +348,7 @@ export default function AdminDashboard() {
                           {b.selections.map((s, idx) => (
                             <Chip
                               key={idx}
-                              label={`${consoleName(s.consoleId)} • ${s.durationLabel}`}
+                              label={consoleName(s.consoleId)}
                               size="small"
                               sx={{
                                 height: 18,
@@ -394,21 +387,6 @@ export default function AdminDashboard() {
                             ) || 0}{" "}
                             / ₹{b.totalPrice || 0}
                           </Typography>
-                          {b.payments && b.payments.length > 0 && (
-                            <Typography
-                              variant="caption"
-                              color="text.secondary"
-                              sx={{ fontSize: "0.6rem" }}
-                            >
-                              {b.payments
-                                .map((p) =>
-                                  p.type === 1
-                                    ? `G:${p.amount}`
-                                    : `C:${p.amount}`,
-                                )
-                                .join(", ")}
-                            </Typography>
-                          )}
                         </Stack>
                       </TableCell>
                       <TableCell align="right">
@@ -448,57 +426,42 @@ export default function AdminDashboard() {
                           {b.confirmed ? (
                             <Tooltip title="Void">
                               <IconButton
+                                size="small"
                                 color="error"
                                 onClick={() => {
                                   setBookingToCancel(b.id);
                                   setCancelConfirmOpen(true);
                                 }}
                                 disabled={actionLoading === b.id}
-                                sx={{
-                                  borderRadius: 0.5,
-                                  p: 0.5,
-                                  opacity: 0.7,
-                                  "&:hover": { opacity: 1 },
-                                }}
                               >
-                                <CancelIcon sx={{ fontSize: "1.2rem" }} />
+                                <CancelIcon sx={{ fontSize: "1rem" }} />
                               </IconButton>
                             </Tooltip>
                           ) : (
                             <Tooltip title="Restore">
                               <IconButton
+                                size="small"
                                 color="success"
                                 onClick={() => {
                                   setBookingToRestore(b.id);
                                   setRestoreConfirmOpen(true);
                                 }}
                                 disabled={actionLoading === b.id}
-                                sx={{
-                                  borderRadius: 0.5,
-                                  p: 0.5,
-                                  opacity: 0.7,
-                                  "&:hover": { opacity: 1 },
-                                }}
                               >
-                                <RestoreIcon sx={{ fontSize: "1.2rem" }} />
+                                <RestoreIcon sx={{ fontSize: "1rem" }} />
                               </IconButton>
                             </Tooltip>
                           )}
                           <Tooltip title="Edit">
                             <IconButton
+                              size="small"
                               onClick={() => {
                                 setEditingBooking(b);
                                 setCreateBookingOpen(true);
                               }}
                               disabled={actionLoading === b.id}
-                              sx={{
-                                borderRadius: 0.5,
-                                p: 0.5,
-                                opacity: 0.7,
-                                "&:hover": { opacity: 1 },
-                              }}
                             >
-                              <EditIcon sx={{ fontSize: "1.2rem" }} />
+                              <EditIcon sx={{ fontSize: "1rem" }} />
                             </IconButton>
                           </Tooltip>
                         </Stack>
@@ -507,11 +470,23 @@ export default function AdminDashboard() {
                   ))}
                 </TableBody>
               </Table>
-            )}
-          </Stack>
-        )}
-      </Paper>
+              <TablePagination
+                component="div"
+                count={(data as any).pagination?.total || 0}
+                page={page}
+                onPageChange={(_, newPage) => setPage(newPage)}
+                rowsPerPage={rowsPerPage}
+                onRowsPerPageChange={(e) => {
+                  setRowsPerPage(parseInt(e.target.value, 10));
+                  setPage(0);
+                }}
+              />
+            </>
+          )}
+        </Paper>
+      </Stack>
 
+      {/* Dialogs */}
       <AdminCreateBookingDialog
         open={isCreateBookingOpen}
         onClose={() => {
@@ -519,9 +494,9 @@ export default function AdminDashboard() {
           setEditingBooking(null);
         }}
         onSuccess={() => {
-          load(date);
+          load();
+          if (onSuccess) onSuccess();
         }}
-        defaultDate={date}
         initialData={editingBooking || undefined}
       />
 
@@ -600,6 +575,6 @@ export default function AdminDashboard() {
           </Button>
         </DialogActions>
       </Dialog>
-    </Stack>
+    </Box>
   );
 }

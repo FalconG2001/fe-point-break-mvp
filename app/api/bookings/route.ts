@@ -35,12 +35,10 @@ export async function POST(req: Request) {
     totalPrice,
   } = parsed.data;
 
-  if (!isDateAllowed(date)) {
+  const isAdmin = bookingFrom === "admin";
+  if (!isAdmin && !isDateAllowed(date)) {
     return NextResponse.json({ error: "Date not allowed" }, { status: 400 });
   }
-
-  // Prevent booking past slots for today (unless admin)
-  const isAdmin = bookingFrom === "admin";
   if (!isAdmin && isSlotPast(date, slot)) {
     return NextResponse.json(
       { error: "This time slot has already passed" },
@@ -219,7 +217,8 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Invalid booking id" }, { status: 400 });
   }
 
-  if (!isDateAllowed(date)) {
+  const isAdmin = bookingFrom === "admin";
+  if (!isAdmin && !isDateAllowed(date)) {
     return NextResponse.json({ error: "Date not allowed" }, { status: 400 });
   }
 

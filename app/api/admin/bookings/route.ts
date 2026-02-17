@@ -24,15 +24,37 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const date = url.searchParams.get("date") || "";
-  if (!isDateAllowed(date)) {
-    return NextResponse.json({ error: "Date not allowed" }, { status: 400 });
+  const startDate = url.searchParams.get("startDate");
+  const endDate = url.searchParams.get("endDate");
+  const searchName = url.searchParams.get("searchName");
+  const page = parseInt(url.searchParams.get("page") || "1", 10);
+  const limit = parseInt(url.searchParams.get("limit") || "10", 10);
+
+  const query: any = {};
+
+  if (date) {
+    if (!startDate && !endDate && !isDateAllowed(date)) {
+      return NextResponse.json({ error: "Date not allowed" }, { status: 400 });
+    }
+    query.date = date;
+  } else if (startDate && endDate) {
+    query.date = { $gte: startDate, $lte: endDate };
+  }
+
+  if (searchName) {
+    query["customer.name"] = { $regex: searchName, $options: "i" };
   }
 
   const db = await getDb();
+  const totalCount = await db.collection("bookings").countDocuments(query);
+  const skip = (page - 1) * limit;
+
   const bookings = await db
     .collection("bookings")
-    .find({ date })
-    .sort({ slot: 1, createdAt: 1 })
+    .find(query)
+    .sort({ date: -1, slot: 1, createdAt: 1 })
+    .skip(skip)
+    .limit(limit)
     .toArray();
 
   const mapped = bookings.map((b) => {
@@ -72,8 +94,11 @@ export async function GET(req: Request) {
     };
   });
 
+  // Calculate stats should ideally ONLY happen for the single date view (first table)
+  // or be based on the filtered set. The prompt doesn't specify stats for the range table.
+  // We'll keep them but they might be less relevant for a large range.
   const confirmedBookings = mapped.filter((b) => b.confirmed);
-  const totalBookings = confirmedBookings.length;
+  const totalBookingsCount = confirmedBookings.length;
   const totalConsolesBooked = confirmedBookings.reduce(
     (sum, b) => sum + (b.selections?.length ?? 0),
     0,
@@ -108,6 +133,7 @@ export async function GET(req: Request) {
     let maxMins = 0;
     for (const b of confirmedBookings) {
       for (const s of b.selections) {
+        if (!s.endTime) continue;
         const [h, m] = s.endTime.split(":").map(Number);
         const mins = h * 60 + m;
         if (mins > maxMins) maxMins = mins;
@@ -120,13 +146,19 @@ export async function GET(req: Request) {
 
   return NextResponse.json({
     date,
-    totalBookings,
+    totalBookings: totalBookingsCount,
     totalConsolesBooked,
     totalPlayers,
     grandTotalPaid,
     grandTotalDue,
     lastSlotEnding,
     bookings: mapped,
+    pagination: {
+      total: totalCount,
+      page,
+      limit,
+      totalPages: Math.ceil(totalCount / limit),
+    },
   });
 }
 
