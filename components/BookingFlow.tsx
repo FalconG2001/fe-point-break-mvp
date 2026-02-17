@@ -1,18 +1,16 @@
 "use client";
 
 import * as React from "react";
-import {
-  Container,
-  Stack,
-  Typography,
-  Button,
-  Divider,
-  Snackbar,
-  Stepper,
-  Step,
-  StepLabel,
-  Paper,
-} from "@mui/material";
+import Container from "@mui/material/Container";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import Button from "@mui/material/Button";
+import Divider from "@mui/material/Divider";
+import Snackbar from "@mui/material/Snackbar";
+import Stepper from "@mui/material/Stepper";
+import Step from "@mui/material/Step";
+import StepLabel from "@mui/material/StepLabel";
+import Paper from "@mui/material/Paper";
 import ConsoleCards from "./ConsoleCards";
 import DateTabs from "./DateTabs";
 import TimeSlotPicker from "./TimeSlotPicker";

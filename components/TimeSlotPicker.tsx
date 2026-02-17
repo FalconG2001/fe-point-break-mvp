@@ -1,6 +1,10 @@
 "use client";
 
-import { Grid, Button, Typography, Stack, Chip } from "@mui/material";
+import Grid from "@mui/material/Grid";
+import Button from "@mui/material/Button";
+import Typography from "@mui/material/Typography";
+import Stack from "@mui/material/Stack";
+import Chip from "@mui/material/Chip";
 import type { AvailabilitySlot } from "@/types";
 
 type Props = {

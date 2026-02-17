@@ -1,30 +1,25 @@
 "use client";
 
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  Button,
-} from "@mui/material";
 import * as React from "react";
-import {
-  Stack,
-  Typography,
-  Alert,
-  Paper,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  Chip,
-  IconButton,
-  Tooltip,
-  Grid,
-} from "@mui/material";
-import dayjs from "dayjs";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogActions from "@mui/material/DialogActions";
+import Button from "@mui/material/Button";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import Alert from "@mui/material/Alert";
+import Paper from "@mui/material/Paper";
+import Table from "@mui/material/Table";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import TableCell from "@mui/material/TableCell";
+import TableBody from "@mui/material/TableBody";
+import Chip from "@mui/material/Chip";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
+import Grid from "@mui/material/Grid";
 import CancelIcon from "@mui/icons-material/Cancel";
 import RestoreIcon from "@mui/icons-material/Restore";
 import EditIcon from "@mui/icons-material/Edit";
@@ -34,9 +29,13 @@ import AdminCreateBookingDialog from "./AdminCreateBookingDialog";
 import { AdminBooking, ApiResp, consoleName } from "@/lib/types";
 import { useAdmin } from "./AdminContext";
 
-export default function AdminDashboard() {
-  const [date, setDate] = React.useState(todayYmd(0));
-  const [data, setData] = React.useState<ApiResp | null>(null);
+interface AdminDashboardProps {
+  initialData?: ApiResp;
+}
+
+export default function AdminDashboard({ initialData }: AdminDashboardProps) {
+  const [date, setDate] = React.useState(initialData?.date || todayYmd(0));
+  const [data, setData] = React.useState<ApiResp | null>(initialData || null);
   const [loading, setLoading] = React.useState(false);
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
   const { isCreateBookingOpen, setCreateBookingOpen, refreshTrigger } =
@@ -99,7 +98,13 @@ export default function AdminDashboard() {
     }
   }
 
+  const isInitialMount = React.useRef(true);
+
   React.useEffect(() => {
+    if (isInitialMount.current && initialData && date === initialData.date) {
+      isInitialMount.current = false;
+      return;
+    }
     load(date);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, refreshTrigger]);

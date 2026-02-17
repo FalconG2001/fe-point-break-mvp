@@ -1,13 +1,11 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  Typography,
-  Grid,
-  Chip,
-  Stack,
-} from "@mui/material";
+import Card from "@mui/material/Card";
+import CardContent from "@mui/material/CardContent";
+import Typography from "@mui/material/Typography";
+import Grid from "@mui/material/Grid";
+import Chip from "@mui/material/Chip";
+import Stack from "@mui/material/Stack";
 import SportsEsportsIcon from "@mui/icons-material/SportsEsports";
 import TvIcon from "@mui/icons-material/Tv";
 import { CONSOLES, TV_COUNT, CENTRE_NAME } from "@/lib/config";

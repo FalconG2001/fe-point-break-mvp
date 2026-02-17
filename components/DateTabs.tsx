@@ -1,7 +1,8 @@
 "use client";
 
-import * as React from "react";
-import { Tabs, Tab, Paper } from "@mui/material";
+import Tabs from "@mui/material/Tabs";
+import Tab from "@mui/material/Tab";
+import Paper from "@mui/material/Paper";
 import { todayYmd } from "@/lib/config";
 
 type Props = {

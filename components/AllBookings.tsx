@@ -1,29 +1,27 @@
 "use client";
 
 import * as React from "react";
-import {
-  Stack,
-  Typography,
-  Paper,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  Chip,
-  IconButton,
-  Tooltip,
-  Grid,
-  TextField,
-  TablePagination,
-  Box,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogContentText,
-  DialogActions,
-  Button,
-} from "@mui/material";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import Paper from "@mui/material/Paper";
+import Table from "@mui/material/Table";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import TableCell from "@mui/material/TableCell";
+import TableBody from "@mui/material/TableBody";
+import Chip from "@mui/material/Chip";
+import IconButton from "@mui/material/IconButton";
+import Tooltip from "@mui/material/Tooltip";
+import Grid from "@mui/material/Grid";
+import TextField from "@mui/material/TextField";
+import TablePagination from "@mui/material/TablePagination";
+import Box from "@mui/material/Box";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogActions from "@mui/material/DialogActions";
+import Button from "@mui/material/Button";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
@@ -39,15 +37,19 @@ import { useAdmin } from "./AdminContext";
 
 interface AllBookingsProps {
   onSuccess?: () => void;
+  initialData?: ApiResp;
 }
 
-export default function AllBookings({ onSuccess }: AllBookingsProps) {
+export default function AllBookings({
+  onSuccess,
+  initialData,
+}: AllBookingsProps) {
   const { isCreateBookingOpen, setCreateBookingOpen, refreshTrigger } =
     useAdmin();
   const [rangeStart, setRangeStart] = React.useState<Dayjs | null>(null);
   const [rangeEnd, setRangeEnd] = React.useState<Dayjs | null>(null);
   const [searchName, setSearchName] = React.useState("");
-  const [data, setData] = React.useState<ApiResp | null>(null);
+  const [data, setData] = React.useState<ApiResp | null>(initialData || null);
   const [loading, setLoading] = React.useState(false);
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
   const [page, setPage] = React.useState(0);
@@ -112,7 +114,13 @@ export default function AllBookings({ onSuccess }: AllBookingsProps) {
     }
   }
 
+  const isInitialMount = React.useRef(true);
+
   React.useEffect(() => {
+    if (isInitialMount.current && initialData) {
+      isInitialMount.current = false;
+      return;
+    }
     load();
   }, [rangeStart, rangeEnd, searchName, page, rowsPerPage, refreshTrigger]);
 

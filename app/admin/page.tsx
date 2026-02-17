@@ -1,22 +1,17 @@
-"use client";
-
-import { useSession } from "next-auth/react";
-import { Container, Stack, Alert } from "@mui/material";
-import AdminLoginCard from "@/components/AdminLoginCard";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { isAdminAllowed } from "@/lib/mongodb";
+import { todayYmd } from "@/lib/config";
+import { getAdminBookings } from "@/lib/admin-actions";
 import AdminDashboard from "@/components/AdminDashboard";
+import AdminLoginCard from "@/components/AdminLoginCard";
+import { Alert, Container, Stack } from "@mui/material";
 
-export default function AdminPage() {
-  const { data: session, status } = useSession();
+export default async function AdminPage() {
+  const session = await getServerSession(authOptions);
+  const email = session?.user?.email?.toLowerCase();
 
-  if (status === "loading") {
-    return (
-      <Container maxWidth="sm" sx={{ py: 4 }}>
-        <Alert severity="info">Loading…</Alert>
-      </Container>
-    );
-  }
-
-  if (!session?.user?.email) {
+  if (!email) {
     return (
       <Container maxWidth="sm" sx={{ py: 4 }}>
         <Stack spacing={2}>
@@ -29,5 +24,18 @@ export default function AdminPage() {
     );
   }
 
-  return <AdminDashboard />;
+  const allowed = await isAdminAllowed(email);
+  if (!allowed) {
+    return (
+      <Container maxWidth="sm" sx={{ py: 4 }}>
+        <Alert severity="error">Not allowed</Alert>
+      </Container>
+    );
+  }
+
+  const initialData = await getAdminBookings({
+    date: todayYmd(0),
+  });
+
+  return <AdminDashboard initialData={initialData} />;
 }

@@ -1,20 +1,18 @@
 "use client";
 
 import * as React from "react";
-import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  TextField,
-  Stack,
-  Alert,
-  Typography,
-  Chip,
-  Divider,
-  Paper,
-} from "@mui/material";
+import Dialog from "@mui/material/Dialog";
+import DialogTitle from "@mui/material/DialogTitle";
+import DialogContent from "@mui/material/DialogContent";
+import DialogActions from "@mui/material/DialogActions";
+import Button from "@mui/material/Button";
+import TextField from "@mui/material/TextField";
+import Stack from "@mui/material/Stack";
+import Alert from "@mui/material/Alert";
+import Typography from "@mui/material/Typography";
+import Chip from "@mui/material/Chip";
+import Divider from "@mui/material/Divider";
+import Paper from "@mui/material/Paper";
 import type { ConsoleId, DurationMinutes } from "@/lib/config";
 import { CONSOLES, DURATION_LABELS } from "@/lib/config";
 
