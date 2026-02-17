@@ -25,16 +25,20 @@ import {
 } from "@/lib/config";
 import type { AvailabilitySlot } from "@/types";
 
-type AvailabilityResponse = {
+interface AvailabilityResponse {
   date: string;
   slots: AvailabilitySlot[];
-};
+}
 
-export default function BookingFlow() {
-  const [date, setDate] = React.useState(todayYmd(0));
+interface BookingFlowProps {
+  initialData?: AvailabilityResponse;
+}
+
+export default function BookingFlow({ initialData }: BookingFlowProps) {
+  const [date, setDate] = React.useState(initialData?.date || todayYmd(0));
   const [availability, setAvailability] = React.useState<
     AvailabilitySlot[] | null
-  >(null);
+  >(initialData?.slots || null);
   const [slot, setSlot] = React.useState<string | null>(null);
   const [selection, setSelection] = React.useState<SelectionState>({});
   const [loadingAvail, setLoadingAvail] = React.useState(false);
@@ -70,7 +74,13 @@ export default function BookingFlow() {
     }
   }
 
+  const isInitialMount = React.useRef(true);
+
   React.useEffect(() => {
+    if (isInitialMount.current && initialData && date === initialData.date) {
+      isInitialMount.current = false;
+      return;
+    }
     loadAvailability(date);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
