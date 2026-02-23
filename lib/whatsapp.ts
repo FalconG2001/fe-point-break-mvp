@@ -3,7 +3,7 @@
  * Uses Meta Cloud API for sending messages
  */
 
-const WHATSAPP_API_URL = "https://graph.facebook.com/v18.0";
+const WHATSAPP_API_URL = "https://graph.facebook.com/v22.0";
 
 interface WhatsAppTextMessage {
   messaging_product: "whatsapp";
@@ -71,6 +71,8 @@ export async function sendTextMessage(to: string, text: string): Promise<void> {
   const url = `${WHATSAPP_API_URL}/${phoneNumberId}/messages`;
   console.log(`POSTing to ${url}`);
 
+  console.log(JSON.stringify(message));
+
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -90,7 +92,64 @@ export async function sendTextMessage(to: string, text: string): Promise<void> {
     throw new Error(`Failed to send message: ${response.status}`);
   }
 
+  console.log(await response.json());
+
   console.log(`Successfully sent text message to ${to}`);
+}
+
+/**
+ * Send a template message (bypasses the 24-hour conversation window)
+ */
+export async function sendTemplateMessage(
+  to: string,
+  templateName: string,
+  languageCode: string = "en",
+  components?: Array<{
+    type: string;
+    parameters: Array<{ type: string; text: string }>;
+  }>,
+): Promise<void> {
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+
+  if (!phoneNumberId || !accessToken) {
+    throw new Error("WhatsApp credentials not configured");
+  }
+
+  const message = {
+    messaging_product: "whatsapp",
+    to,
+    type: "template",
+    template: {
+      name: templateName,
+      language: { code: languageCode },
+      ...(components ? { components } : {}),
+    },
+  };
+
+  const url = `${WHATSAPP_API_URL}/${phoneNumberId}/messages`;
+  console.log(`[template] POSTing to ${url}`, JSON.stringify(message));
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(message),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.error("WhatsApp template API error:", {
+      status: response.status,
+      body: errorBody,
+    });
+    throw new Error(`Failed to send template message: ${response.status}`);
+  }
+
+  console.log(await response.json());
+  console.log(`Successfully sent template message to ${to}`);
 }
 
 /**
