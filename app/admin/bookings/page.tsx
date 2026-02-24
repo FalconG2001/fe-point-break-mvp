@@ -1,6 +1,8 @@
-import AllBookings from "@/components/AllBookings";
-import { getAdminBookings } from "@/lib/admin-actions";
 import { getServerSession } from "next-auth";
+
+import AllBookings from "@/components/AllBookings";
+
+import { getAdminBookings } from "@/lib/admin-actions";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { isAdminAllowed } from "@/lib/mongodb";

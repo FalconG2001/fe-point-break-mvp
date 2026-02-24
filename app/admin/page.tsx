@@ -1,11 +1,16 @@
 import { getServerSession } from "next-auth";
+
+import Alert from "@mui/material/Alert";
+import Container from "@mui/material/Container";
+import Stack from "@mui/material/Stack";
+
+import AdminDashboard from "@/components/AdminDashboard";
+import AdminLoginCard from "@/components/AdminLoginCard";
+
 import { authOptions } from "@/lib/auth";
 import { isAdminAllowed } from "@/lib/mongodb";
 import { todayYmd } from "@/lib/config";
 import { getAdminBookings } from "@/lib/admin-actions";
-import AdminDashboard from "@/components/AdminDashboard";
-import AdminLoginCard from "@/components/AdminLoginCard";
-import { Alert, Container, Stack } from "@mui/material";
 
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
