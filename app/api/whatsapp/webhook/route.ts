@@ -10,7 +10,7 @@ import {
   sendButtonMessage,
   parseWebhookMessage,
 } from "@/lib/whatsapp";
-// import { sendBookingNotification } from "@/lib/whatsapp-notify";
+import { sendBookingNotification } from "@/lib/whatsapp-notify";
 import {
   getSession,
   updateSession,
@@ -463,15 +463,15 @@ async function handleConfirmation(
     const insertResult = await db.collection("bookings").insertOne(doc);
 
     // Fire-and-forget WhatsApp notification to admin
-    // sendBookingNotification({
-    //   bookingId: String(insertResult.insertedId),
-    //   date,
-    //   slot,
-    //   selections: [{ consoleId, duration, players: 1 }],
-    //   customerName,
-    //   customerPhone: from,
-    //   bookingFrom: "whatsapp",
-    // }).catch(() => {});
+    sendBookingNotification({
+      bookingId: String(insertResult.insertedId),
+      date,
+      slot,
+      selections: [{ consoleId, duration, players: 1 }],
+      customerName,
+      customerPhone: from,
+      bookingFrom: "whatsapp",
+    }).catch(() => {});
 
     const consoleName =
       CONSOLES.find((c) => c.id === consoleId)?.name || consoleId;

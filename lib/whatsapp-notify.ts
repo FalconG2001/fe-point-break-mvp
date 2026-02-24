@@ -69,7 +69,7 @@ export async function sendBookingNotification(
     await sendTemplateMessage(
       ADMIN_NOTIFY_NUMBER,
       "booking_notification",
-      "en_US",
+      "en",
       [
         {
           type: "body",

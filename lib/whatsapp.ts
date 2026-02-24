@@ -128,7 +128,7 @@ export async function sendTemplateMessage(
   };
 
   const url = `${WHATSAPP_API_URL}/${phoneNumberId}/messages`;
-  console.log(`[template] POSTing to ${url}`, JSON.stringify(message));
+  // console.log(`[template] POSTing to ${url}`, JSON.stringify(message));
 
   const response = await fetch(url, {
     method: "POST",
@@ -148,8 +148,8 @@ export async function sendTemplateMessage(
     throw new Error(`Failed to send template message: ${response.status}`);
   }
 
-  console.log(await response.json());
-  console.log(`Successfully sent template message to ${to}`);
+  // console.log(await response.json());
+  // console.log(`Successfully sent template message to ${to}`);
 }
 
 /**

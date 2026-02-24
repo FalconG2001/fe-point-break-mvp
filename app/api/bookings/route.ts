@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-// import { sendBookingNotification } from "@/lib/whatsapp-notify";
+import { sendBookingNotification } from "@/lib/whatsapp-notify";
 import { getDb } from "@/lib/mongodb";
 import {
   CONSOLES,
@@ -175,16 +175,16 @@ export async function POST(req: Request) {
   const res = await db.collection("bookings").insertOne(doc);
 
   // Fire-and-forget WhatsApp notification to admin
-  // sendBookingNotification({
-  //   bookingId: String(res.insertedId),
-  //   date,
-  //   slot,
-  //   selections,
-  //   customerName: name,
-  //   customerPhone: phone || "",
-  //   bookingFrom,
-  //   totalPrice,
-  // }).catch(() => {});
+  sendBookingNotification({
+    bookingId: String(res.insertedId),
+    date,
+    slot,
+    selections,
+    customerName: name,
+    customerPhone: phone || "",
+    bookingFrom,
+    totalPrice,
+  }).catch(() => {});
 
   return NextResponse.json({ ok: true, id: String(res.insertedId) });
 }
