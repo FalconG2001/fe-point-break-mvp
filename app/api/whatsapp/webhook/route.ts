@@ -4,6 +4,8 @@
  */
 
 import { NextResponse } from "next/server";
+import { Db } from "mongodb";
+
 import {
   sendTextMessage,
   sendListMessage,
@@ -33,6 +35,39 @@ import {
 // Default duration for WhatsApp bookings (1 hour)
 const DEFAULT_DURATION = 60;
 
+const MAX_WA_BOOKINGS_PER_DAY = 3;
+
+async function countActiveWhatsAppBookings(
+  db: Db,
+  phone: string,
+  date: string,
+) {
+  return db.collection("bookings").countDocuments({
+    date,
+    bookingFrom: "whatsapp",
+    confirmed: { $ne: false },
+    "customer.phone": phone,
+  });
+}
+
+async function getActiveWhatsAppBookingsForDates(
+  db: Db,
+  phone: string,
+  dates: string[],
+) {
+  return db
+    .collection("bookings")
+    .find({
+      bookingFrom: "whatsapp",
+      confirmed: { $ne: false },
+      "customer.phone": phone,
+      date: { $in: dates },
+    })
+    .project({ _id: 0, date: 1, slot: 1, selections: 1 })
+    .sort({ date: 1, slot: 1 })
+    .toArray();
+}
+
 /**
  * GET - Webhook verification endpoint
  * Meta sends a GET request to verify the webhook
@@ -59,7 +94,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
-    console.log("Incoming WhatsApp Webhook Body:", rawBody);
+    // console.log("Incoming WhatsApp Webhook Body:", rawBody);
 
     let body;
     try {
@@ -74,25 +109,25 @@ export async function POST(req: Request) {
 
     // Parse the incoming message
     const message = parseWebhookMessage(body);
-    console.log("Parsed WhatsApp Message:", message);
+    // console.log("Parsed WhatsApp Message:", message);
 
     // If no message (could be status update), acknowledge
     if (!message) {
-      console.log(
-        "No valid message found in webhook payload (likely a status update)",
-      );
+      // console.log(
+      //   "No valid message found in webhook payload (likely a status update)",
+      // );
       return NextResponse.json({ status: "ok" });
     }
 
     // Get or create session for this user
-    console.log(`Getting session for ${message.from}`);
+    // console.log(`Getting session for ${message.from}`);
     const session = await getSession(message.from);
-    console.log(`Current state for ${message.from}: ${session.state}`);
+    // console.log(`Current state for ${message.from}: ${session.state}`);
 
     // Route based on session state and message type
     await handleMessage(message.from, session.state, session.data, message);
 
-    console.log(`Successfully handled message from ${message.from}`);
+    // console.log(`Successfully handled message from ${message.from}`);
     return NextResponse.json({ status: "ok" });
   } catch (error) {
     console.error("Webhook processing error:", error);
@@ -112,6 +147,11 @@ async function handleMessage(
 ) {
   const text = message.text?.toLowerCase().trim() || "";
   const replyId = message.interactiveReplyId || "";
+  if (replyId === "book_again" || replyId === "show_dates") {
+    await clearSession(from);
+    await handleIdle(from, "book");
+    return;
+  }
 
   // Handle reset/cancel/ping commands anytime
   const resetKeywords = [
@@ -126,7 +166,7 @@ async function handleMessage(
     "ping",
   ];
   if (resetKeywords.includes(text)) {
-    console.log(`Command detected: ${text}`);
+    // console.log(`Command detected: ${text}`);
     if (text === "ping") {
       await sendTextMessage(from, "pong 🏓");
       return;
@@ -170,7 +210,6 @@ async function handleMessage(
  * Handle idle state - show welcome and date options
  */
 async function handleIdle(from: string, text: string) {
-  // Any message starts the booking flow
   const keywords = ["book", "hi", "hello", "hey", "start", "menu"];
   const isGreeting = keywords.some((k) => text.includes(k)) || text.length < 20;
 
@@ -182,28 +221,71 @@ async function handleIdle(from: string, text: string) {
     return;
   }
 
-  // Show date selection
-  const dates = [
-    { id: todayYmd(0), label: "Today" },
-    { id: todayYmd(1), label: "Tomorrow" },
-    { id: todayYmd(2), label: "Day After Tomorrow" },
-  ];
+  const dates = [todayYmd(0), todayYmd(1), todayYmd(2)];
+  const db = await getDb();
+  const existing = await getActiveWhatsAppBookingsForDates(db, from, dates);
 
+  if (existing.length > 0) {
+    // group by date
+    const byDate = new Map<string, any[]>();
+    for (const b of existing) {
+      const arr = byDate.get(b.date) ?? [];
+      arr.push(b);
+      byDate.set(b.date, arr);
+    }
+
+    let msg = `You already have bookings:\n`;
+    for (const d of dates) {
+      const list = byDate.get(d) ?? [];
+      if (list.length === 0) continue;
+      msg += `\n${formatDateDisplay(d)} (${list.length}/${MAX_WA_BOOKINGS_PER_DAY})\n`;
+      for (const b of list) msg += `• ${b.slot}\n`;
+    }
+
+    const canBookAny = dates.some(
+      (d) => (byDate.get(d)?.length ?? 0) < MAX_WA_BOOKINGS_PER_DAY,
+    );
+
+    if (canBookAny) {
+      await sendButtonMessage(from, msg + `\nWant to book again?`, [
+        { id: "book_again", title: "Book again" },
+        { id: "show_dates", title: "Pick date" },
+      ]);
+    } else {
+      await sendTextMessage(
+        from,
+        msg + `\nDaily limit reached for all available dates.`,
+      );
+    }
+  }
+
+  // start flow as normal
   await updateSession(from, "awaiting_date", {});
-
   await sendListMessage(
     from,
     `${CENTRE_NAME} Booking`,
-    "Welcome! 🎮\n\nLet's book your gaming session. First, pick a date:\n\n(Send 'cancel' to start over)",
+    "Pick a date:\n\n(Send 'cancel' to start over)",
     "Select Date",
     [
       {
         title: "Available Dates",
-        rows: dates.map((d) => ({
-          id: `date_${d.id}`,
-          title: d.label,
-          description: formatDateDisplay(d.id),
-        })),
+        rows: [
+          {
+            id: `date_${dates[0]}`,
+            title: "Today",
+            description: formatDateDisplay(dates[0]),
+          },
+          {
+            id: `date_${dates[1]}`,
+            title: "Tomorrow",
+            description: formatDateDisplay(dates[1]),
+          },
+          {
+            id: `date_${dates[2]}`,
+            title: "Day After Tomorrow",
+            description: formatDateDisplay(dates[2]),
+          },
+        ],
       },
     ],
   );
@@ -219,6 +301,19 @@ async function handleDateSelection(from: string, replyId: string) {
   }
 
   const date = replyId.replace("date_", "");
+
+  const db = await getDb();
+  const used = await countActiveWhatsAppBookings(db, from, date);
+
+  if (used >= MAX_WA_BOOKINGS_PER_DAY) {
+    await sendTextMessage(
+      from,
+      `You already have ${used}/${MAX_WA_BOOKINGS_PER_DAY} bookings for ${formatDateDisplay(date)}.\nPick another date.`,
+    );
+    await clearSession(from);
+    await handleIdle(from, "book");
+    return;
+  }
 
   // Get availability for this date
   const availability = await getAvailability(date);
@@ -424,6 +519,18 @@ async function handleConfirmation(
     customerName: string;
     duration: number;
   };
+
+  const db = await getDb();
+  const used = await countActiveWhatsAppBookings(db, from, date);
+
+  if (used >= MAX_WA_BOOKINGS_PER_DAY) {
+    await sendTextMessage(
+      from,
+      `Limit reached: ${used}/${MAX_WA_BOOKINGS_PER_DAY} bookings for ${formatDateDisplay(date)}.\nTry another date.`,
+    );
+    await clearSession(from);
+    return;
+  }
 
   // Double-check availability before creating booking
   const availability = await getAvailability(date);

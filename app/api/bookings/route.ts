@@ -16,25 +16,24 @@ import { authOptions } from "@/lib/auth";
 import { isAdminAllowed } from "@/lib/mongodb";
 
 export async function POST(req: Request) {
+  const session = await getServerSession(authOptions);
+  const email = session?.user?.email?.toLowerCase();
+  const adminAllowed = email ? await isAdminAllowed(email) : false;
+
   const body = await req.json().catch(() => null);
   const parsed = CreateBookingSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Invalid input", details: parsed.error.flatten() },
-      { status: 400 },
-    );
+    return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  const {
-    date,
-    slot,
-    selections,
-    name,
-    phone,
-    bookingFrom,
-    payments,
-    totalPrice,
-  } = parsed.data;
+  // ✅ override client input
+  const bookingFrom = adminAllowed ? "admin" : "website";
+
+  // ✅ ignore money fields for public users
+  const payments = adminAllowed ? parsed.data.payments || [] : [];
+  const totalPrice = adminAllowed ? parsed.data.totalPrice || 0 : 0;
+
+  const { date, slot, selections, name, phone } = parsed.data;
 
   const isAdmin = bookingFrom === "admin";
   if (!isAdmin && !isDateAllowed(date)) {

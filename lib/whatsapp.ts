@@ -51,7 +51,7 @@ export async function sendTextMessage(to: string, text: string): Promise<void> {
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
 
-  console.log(`Attempting to send text message to ${to}`);
+  // console.log(`Attempting to send text message to ${to}`);
 
   if (!phoneNumberId || !accessToken) {
     console.error("WhatsApp credentials missing:", {
@@ -69,9 +69,9 @@ export async function sendTextMessage(to: string, text: string): Promise<void> {
   };
 
   const url = `${WHATSAPP_API_URL}/${phoneNumberId}/messages`;
-  console.log(`POSTing to ${url}`);
+  // console.log(`POSTing to ${url}`);
 
-  console.log(JSON.stringify(message));
+  // console.log(JSON.stringify(message));
 
   const response = await fetch(url, {
     method: "POST",
@@ -92,7 +92,7 @@ export async function sendTextMessage(to: string, text: string): Promise<void> {
     throw new Error(`Failed to send message: ${response.status}`);
   }
 
-  console.log(await response.json());
+  // console.log(await response.json());
 
   console.log(`Successfully sent text message to ${to}`);
 }
@@ -168,7 +168,7 @@ export async function sendListMessage(
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
 
-  console.log(`Attempting to send list message to ${to}`);
+  // console.log(`Attempting to send list message to ${to}`);
 
   if (!phoneNumberId || !accessToken) {
     console.error("WhatsApp credentials missing:", {
@@ -194,7 +194,7 @@ export async function sendListMessage(
   };
 
   const url = `${WHATSAPP_API_URL}/${phoneNumberId}/messages`;
-  console.log(`POSTing to ${url}`);
+  // console.log(`POSTing to ${url}`);
 
   const response = await fetch(url, {
     method: "POST",
@@ -229,7 +229,7 @@ export async function sendButtonMessage(
   const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
   const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
 
-  console.log(`Attempting to send button message to ${to}`);
+  // console.log(`Attempting to send button message to ${to}`);
 
   if (!phoneNumberId || !accessToken) {
     console.error("WhatsApp credentials missing:", {
@@ -259,7 +259,7 @@ export async function sendButtonMessage(
   };
 
   const url = `${WHATSAPP_API_URL}/${phoneNumberId}/messages`;
-  console.log(`POSTing to ${url}`);
+  // console.log(`POSTing to ${url}`);
 
   const response = await fetch(url, {
     method: "POST",
