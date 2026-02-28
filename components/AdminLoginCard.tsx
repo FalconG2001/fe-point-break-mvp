@@ -8,7 +8,11 @@ import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import GoogleIcon from "@mui/icons-material/Google";
 
-export default function AdminLoginCard() {
+export default function AdminLoginCard({
+  callbackUrl = "/admin",
+}: {
+  callbackUrl?: string;
+}) {
   return (
     <Card
       className="glass-panel"
@@ -35,7 +39,7 @@ export default function AdminLoginCard() {
             variant="contained"
             fullWidth
             startIcon={<GoogleIcon />}
-            onClick={() => signIn("google")}
+            onClick={() => signIn("google", { callbackUrl })}
             sx={{
               borderRadius: 0.5,
               py: 1.2,

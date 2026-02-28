@@ -17,12 +17,16 @@ export const authOptions: NextAuthOptions = {
       return await isAdminAllowed(email);
     },
     async jwt({ token, user }) {
-      if (user?.email) token.email = user.email.toLowerCase();
+      if (user?.email) {
+        token.email = user.email.toLowerCase();
+        token.isAdmin = await isAdminAllowed(token.email);
+      }
       return token;
     },
     async session({ session, token }) {
       if (session.user && token.email) {
         session.user.email = String(token.email);
+        (session.user as any).isAdmin = !!token.isAdmin;
       }
       return session;
     },

@@ -71,7 +71,7 @@ export default function AdminHeader() {
         </Button>
         <Button
           variant="outlined"
-          onClick={() => signOut()}
+          onClick={() => signOut({ callbackUrl: "/login" })}
           sx={{
             borderRadius: 1,
             color: "text.primary",

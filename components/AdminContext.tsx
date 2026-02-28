@@ -1,5 +1,7 @@
 "use client";
 
+import type { Session } from "next-auth";
+import { SessionProvider } from "next-auth/react";
 import React, { createContext, useContext, useState } from "react";
 
 interface AdminContextType {
@@ -11,23 +13,31 @@ interface AdminContextType {
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
-export function AdminProvider({ children }: { children: React.ReactNode }) {
+export function AdminProvider({
+  children,
+  session,
+}: {
+  children: React.ReactNode;
+  session: Session | null;
+}) {
   const [isCreateBookingOpen, setCreateBookingOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const triggerRefresh = () => setRefreshTrigger((prev) => prev + 1);
 
   return (
-    <AdminContext.Provider
-      value={{
-        isCreateBookingOpen,
-        setCreateBookingOpen,
-        refreshTrigger,
-        triggerRefresh,
-      }}
-    >
-      {children}
-    </AdminContext.Provider>
+    <SessionProvider session={session}>
+      <AdminContext.Provider
+        value={{
+          isCreateBookingOpen,
+          setCreateBookingOpen,
+          refreshTrigger,
+          triggerRefresh,
+        }}
+      >
+        {children}
+      </AdminContext.Provider>
+    </SessionProvider>
   );
 }
 
