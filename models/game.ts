@@ -35,7 +35,7 @@ const GameSchema = new Schema<IGame>({
   installed: { type: Boolean, default: false },
 });
 
-GameSchema.pre("save", function (next) {
+GameSchema.pre("save", async function (this: IGame) {
   this.installed = this.installedOn && this.installedOn.length > 0;
 });
 

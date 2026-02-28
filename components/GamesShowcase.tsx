@@ -1,5 +1,7 @@
 "use client";
 
+import * as React from "react";
+
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import Stack from "@mui/material/Stack";
@@ -9,7 +11,7 @@ import CardMedia from "@mui/material/CardMedia";
 import Chip from "@mui/material/Chip";
 import Divider from "@mui/material/Divider";
 
-import { CONSOLES, type ConsoleId } from "@/lib/config";
+import { CONSOLES } from "@/lib/config";
 
 type Game = {
   id: string;
@@ -18,84 +20,33 @@ type Game = {
   tag?: string;
 };
 
-const MOCK_GAMES: Record<ConsoleId, Game[]> = {
-  ps5: [
-    {
-      id: "gta5",
-      title: "GTA V",
-      image: "https://placehold.co/600x800?text=GTA+V",
-      tag: "Open world",
-    },
-    {
-      id: "spiderman2",
-      title: "Spider-Man 2",
-      image: "https://placehold.co/600x800?text=Spider-Man+2",
-      tag: "Action",
-    },
-    {
-      id: "fc24",
-      title: "EA FC 24",
-      image: "https://placehold.co/600x800?text=FC+24",
-      tag: "Sports",
-    },
-  ],
-  "xbox-series-x": [
-    {
-      id: "forza",
-      title: "Forza Horizon",
-      image: "https://placehold.co/600x800?text=Forza",
-      tag: "Racing",
-    },
-    {
-      id: "halo",
-      title: "Halo",
-      image: "https://placehold.co/600x800?text=Halo",
-      tag: "Shooter",
-    },
-    {
-      id: "minecraft",
-      title: "Minecraft",
-      image: "https://placehold.co/600x800?text=Minecraft",
-      tag: "Co-op",
-    },
-  ],
-  "xbox-one-s": [
-    {
-      id: "mario",
-      title: "Mario Kart",
-      image: "https://placehold.co/600x800?text=Mario+Kart",
-      tag: "Party",
-    },
-    {
-      id: "zelda",
-      title: "Zelda",
-      image: "https://placehold.co/600x800?text=Zelda",
-      tag: "Adventure",
-    },
-  ],
-  "xbox-360": [
-    {
-      id: "valorant",
-      title: "Valorant",
-      image: "https://placehold.co/600x800?text=Valorant",
-      tag: "Competitive",
-    },
-    {
-      id: "cs2",
-      title: "CS2",
-      image: "https://placehold.co/600x800?text=CS2",
-      tag: "Shooter",
-    },
-    {
-      id: "dota2",
-      title: "Dota 2",
-      image: "https://placehold.co/600x800?text=Dota+2",
-      tag: "MOBA",
-    },
-  ],
+type GameWithConsoles = Game & {
+  installedOn: string[];
 };
 
-export default function GamesShowcase() {
+export default function GamesShowcase({
+  games = [],
+}: {
+  games?: GameWithConsoles[];
+}) {
+  const gamesByConsole = React.useMemo(() => {
+    const map: Record<string, GameWithConsoles[]> = {};
+    for (const g of games) {
+      for (const cidRaw of g.installedOn || []) {
+        // Normalize: DB might have underscores, config has hyphens
+        const cid = cidRaw.replace(/_/g, "-");
+        if (!map[cid]) map[cid] = [];
+        map[cid].push(g);
+      }
+    }
+    return map;
+  }, [games]);
+
+  const hasAnyGames = games.length > 0;
+
+  if (!hasAnyGames) {
+    return null;
+  }
   return (
     <Paper
       elevation={0}
@@ -112,7 +63,7 @@ export default function GamesShowcase() {
             Games installed
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Mock data for now. Replace later with your real DB.
+            Check out the titles we have for you.
           </Typography>
         </Stack>
 
@@ -120,8 +71,8 @@ export default function GamesShowcase() {
 
         <Stack spacing={3}>
           {CONSOLES.map((c) => {
-            const games = MOCK_GAMES[c.id] ?? [];
-            if (games.length === 0) return null;
+            const gamesForConsole = gamesByConsole[c.id] ?? [];
+            if (gamesForConsole.length === 0) return null;
 
             return (
               <Stack key={c.id} spacing={1.5}>
@@ -132,7 +83,7 @@ export default function GamesShowcase() {
                 >
                   <Typography fontWeight={900}>{c.name}</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    {games.length} titles
+                    {gamesForConsole.length} titles
                   </Typography>
                 </Stack>
 
@@ -149,38 +100,57 @@ export default function GamesShowcase() {
                     },
                   }}
                 >
-                  {games.map((g) => (
+                  {gamesForConsole.map((g) => (
                     <Card
                       key={g.id}
                       sx={{
-                        minWidth: 160,
+                        width: 140,
+                        flexShrink: 0,
                         borderRadius: 2,
-                        border: "1px solid rgba(0,0,0,0.08)",
+                        border: "1px solid rgba(0,0,0,0.06)",
                         boxShadow: "none",
+                        transition: "transform 0.2s",
+                        "&:hover": { transform: "translateY(-4px)" },
                       }}
                     >
                       <CardMedia
                         component="img"
-                        height="170"
                         image={g.image}
                         alt={g.title}
-                        style={{ objectFit: "cover" }}
+                        sx={{
+                          height: 180,
+                          objectFit: "cover",
+                          background: "rgba(0,0,0,0.03)",
+                        }}
                       />
-                      <CardContent sx={{ p: 1.5 }}>
-                        <Typography fontWeight={900} variant="body2" noWrap>
+                      <CardContent sx={{ p: 1.2, pb: "12px !important" }}>
+                        <Typography
+                          fontWeight={900}
+                          variant="caption"
+                          sx={{
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                            lineHeight: 1.3,
+                            height: "2.6em",
+                          }}
+                        >
                           {g.title}
                         </Typography>
                         {g.tag && (
-                          <Chip
-                            label={g.tag}
-                            size="small"
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
                             sx={{
-                              mt: 1,
-                              borderRadius: 1,
-                              fontWeight: 900,
-                              background: "rgba(0,0,0,0.05)",
+                              fontSize: "0.65rem",
+                              fontWeight: 700,
+                              mt: 0.5,
+                              display: "block",
                             }}
-                          />
+                          >
+                            {g.tag}
+                          </Typography>
                         )}
                       </CardContent>
                     </Card>

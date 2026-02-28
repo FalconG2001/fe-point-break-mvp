@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { sendBookingNotification } from "@/lib/whatsapp-notify";
 import { connectToDB } from "@/lib/mongodb";
 import Booking from "@/models/booking";
-import { isAdminAllowed } from "@/lib/mongodb";
 import {
   CONSOLES,
   TV_COUNT,
@@ -15,6 +14,7 @@ import { CreateBookingSchema, UpdateBookingSchema } from "@/lib/validators";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import mongoose from "mongoose";
+import { isAdminAllowed } from "@/lib/admin-actions";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);

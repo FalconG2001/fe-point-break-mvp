@@ -53,22 +53,24 @@ export default function AdminHeader() {
         </Stack>
       </Stack>
       <Stack direction="row" spacing={2}>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => {
-            setCreateBookingOpen(true);
-          }}
-          sx={{
-            borderRadius: 1,
-            px: 3,
-            background: "#000",
-            color: "#fff",
-            "&:hover": { background: "#222" },
-          }}
-        >
-          New Booking
-        </Button>
+        {pathname !== "/admin/games" && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => {
+              setCreateBookingOpen(true);
+            }}
+            sx={{
+              borderRadius: 1,
+              px: 3,
+              background: "#000",
+              color: "#fff",
+              "&:hover": { background: "#222" },
+            }}
+          >
+            New Booking
+          </Button>
+        )}
         <Button
           variant="outlined"
           onClick={() => signOut({ callbackUrl: "/login" })}

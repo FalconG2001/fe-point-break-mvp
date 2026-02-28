@@ -34,6 +34,7 @@ import { todayYmd } from "@/lib/config";
 import { AdminBooking, ApiResp, consoleName } from "@/lib/types";
 import AdminCreateBookingDialog from "./AdminCreateBookingDialog";
 import { useAdmin } from "./AdminContext";
+import debounce from "lodash/debounce";
 
 interface AllBookingsProps {
   onSuccess?: () => void;
@@ -49,11 +50,29 @@ export default function AllBookings({
   const [rangeStart, setRangeStart] = React.useState<Dayjs | null>(null);
   const [rangeEnd, setRangeEnd] = React.useState<Dayjs | null>(null);
   const [searchName, setSearchName] = React.useState("");
+  const [debouncedSearchName, setDebouncedSearchName] = React.useState("");
   const [data, setData] = React.useState<ApiResp | null>(initialData || null);
   const [loading, setLoading] = React.useState(false);
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(10);
+
+  // Debounce search name updates
+  const debouncedSetSearch = React.useMemo(
+    () =>
+      debounce((value: string) => {
+        setDebouncedSearchName(value);
+        setPage(0); // Reset to first page on search change
+      }, 500),
+    [],
+  );
+
+  React.useEffect(() => {
+    debouncedSetSearch(searchName);
+    return () => {
+      debouncedSetSearch.cancel();
+    };
+  }, [searchName, debouncedSetSearch]);
 
   const [editingBooking, setEditingBooking] =
     React.useState<AdminBooking | null>(null);
@@ -101,7 +120,7 @@ export default function AllBookings({
       });
       if (sYmd) params.append("startDate", sYmd);
       if (eYmd) params.append("endDate", eYmd);
-      if (searchName) params.append("searchName", searchName);
+      if (debouncedSearchName) params.append("searchName", debouncedSearchName);
 
       const res = await fetch(`/api/admin/bookings?${params.toString()}`);
       const json = await res.json();
@@ -122,7 +141,14 @@ export default function AllBookings({
       return;
     }
     load();
-  }, [rangeStart, rangeEnd, searchName, page, rowsPerPage, refreshTrigger]);
+  }, [
+    rangeStart,
+    rangeEnd,
+    debouncedSearchName,
+    page,
+    rowsPerPage,
+    refreshTrigger,
+  ]);
 
   async function toggleConfirmed(bookingId: string, newConfirmed: boolean) {
     setActionLoading(bookingId);

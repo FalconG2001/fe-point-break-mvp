@@ -38,6 +38,7 @@ interface AvailabilityResponse {
 
 interface BookingFlowProps {
   initialData?: AvailabilityResponse;
+  games?: any[];
 }
 
 function TabPanel(props: {
@@ -53,7 +54,7 @@ function TabPanel(props: {
   );
 }
 
-export default function BookingFlow({ initialData }: BookingFlowProps) {
+export default function BookingFlow({ initialData, games }: BookingFlowProps) {
   const [date, setDate] = React.useState(initialData?.date || todayYmd(0));
   const [availability, setAvailability] = React.useState<
     AvailabilitySlot[] | null
@@ -561,7 +562,7 @@ export default function BookingFlow({ initialData }: BookingFlowProps) {
         </Grid>
 
         {/* Games section stays after booking */}
-        <GamesShowcase />
+        <GamesShowcase games={games} />
 
         <Snackbar
           open={!!toast}

@@ -1,6 +1,6 @@
 import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import { isAdminAllowed } from "./mongodb";
+import { isAdminAllowed } from "./admin-actions";
 
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },

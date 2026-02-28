@@ -4,8 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { connectToDB } from "@/lib/mongodb";
 import Booking from "@/models/booking";
 import mongoose from "mongoose";
-import { isAdminAllowed } from "@/lib/mongodb";
-import { getAdminBookings } from "@/lib/admin-actions";
+import { getAdminBookings, isAdminAllowed } from "@/lib/admin-actions";
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);

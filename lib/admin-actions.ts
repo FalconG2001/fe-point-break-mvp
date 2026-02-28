@@ -1,12 +1,13 @@
 import { connectToDB } from "@/lib/mongodb";
 import Booking from "@/models/booking";
+import Game from "@/models/game";
 import {
   isDateAllowed,
   DURATION_LABELS,
   type DurationMinutes,
 } from "@/lib/config";
 import { ApiResp } from "@/lib/types";
-
+import AdminAllowlist from "@/models/admin-allowlist";
 export interface GetAdminBookingsParams {
   date?: string;
   startDate?: string;
@@ -153,4 +154,25 @@ export async function getAdminBookings(
       totalPages: Math.ceil(totalCount / limit),
     },
   };
+}
+
+export async function isAdminAllowed(email: string): Promise<boolean> {
+  await connectToDB();
+  const found = await AdminAllowlist.findOne({
+    email: email.toLowerCase(),
+  }).lean();
+
+  return !!found;
+}
+
+export async function getInstalledGames() {
+  await connectToDB();
+  const games = await Game.find({ installed: true }).lean();
+  return (games || []).map((g: any) => ({
+    id: String(g._id),
+    title: g.title,
+    image: g.imageUrl,
+    tag: g.genre,
+    installedOn: (g.installedOn || []).map((c: any) => c.consoleId),
+  }));
 }
