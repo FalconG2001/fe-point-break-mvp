@@ -1,4 +1,5 @@
-import { getDb } from "@/lib/mongodb";
+import { connectToDB } from "@/lib/mongodb";
+import Booking from "@/models/booking";
 import {
   isDateAllowed,
   DURATION_LABELS,
@@ -42,17 +43,15 @@ export async function getAdminBookings(
     query["customer.name"] = { $regex: searchName, $options: "i" };
   }
 
-  const db = await getDb();
-  const totalCount = await db.collection("bookings").countDocuments(query);
+  await connectToDB();
+  const totalCount = await Booking.countDocuments(query);
   const skip = (page - 1) * limit;
 
-  const bookings = await db
-    .collection("bookings")
-    .find(query)
+  const bookings = await Booking.find(query)
     .sort({ date: -1, slot: 1, createdAt: 1 })
     .skip(skip)
     .limit(limit)
-    .toArray();
+    .lean();
 
   const mapped = bookings.map((b) => {
     const startMins = (() => {

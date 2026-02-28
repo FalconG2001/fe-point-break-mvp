@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { sendBookingNotification } from "@/lib/whatsapp-notify";
-import { getDb } from "@/lib/mongodb";
+import { connectToDB } from "@/lib/mongodb";
+import Booking from "@/models/booking";
+import { isAdminAllowed } from "@/lib/mongodb";
 import {
   CONSOLES,
   TV_COUNT,
@@ -10,10 +12,9 @@ import {
   getSlotsForDuration,
 } from "@/lib/config";
 import { CreateBookingSchema, UpdateBookingSchema } from "@/lib/validators";
-import { ObjectId } from "mongodb";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { isAdminAllowed } from "@/lib/mongodb";
+import mongoose from "mongoose";
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -88,20 +89,21 @@ export async function POST(req: Request) {
     }
   }
 
-  const db = await getDb();
+  await connectToDB();
 
   // Get all confirmed bookings for this date
-  const existingBookings = await db
-    .collection("bookings")
-    .find({ date, confirmed: { $ne: false } })
-    .project({ _id: 0, slot: 1, selections: 1 })
-    .toArray();
+  const existingBookings = await Booking.find({
+    date,
+    confirmed: { $ne: false },
+  })
+    .select("slot selections")
+    .lean();
 
   // Build a map: slot -> Set of console IDs already booked
   const bookedBySlot = new Map<string, Set<ConsoleId>>();
   for (const b of existingBookings) {
-    const startSlot: string = b.slot;
-    const sel = Array.isArray(b.selections) ? b.selections : [];
+    const startSlot: string = (b as any).slot;
+    const sel = Array.isArray(b.selections) ? (b.selections as any[]) : [];
     for (const s of sel) {
       if (!s?.consoleId) continue;
       const consoleId = s.consoleId as ConsoleId;
@@ -136,10 +138,8 @@ export async function POST(req: Request) {
         );
       }
 
-      // Rule 2: TV capacity (max 3 consoles at once)
-      // Count how many consoles would be active in this slot after adding new ones
+      // Rule 2: TV capacity (max TV_COUNT consoles at once)
       const currentCount = bookedInSlot.size;
-      // Count how many of the requested consoles affect this slot
       const newConsolesInSlot = selections.filter((s) => {
         const slots = getSlotsForDuration(slot, s.duration);
         return slots.includes(coveredSlot);
@@ -159,33 +159,39 @@ export async function POST(req: Request) {
     }
   }
 
-  const doc = {
-    date,
-    slot,
-    selections,
-    customer: { name, phone },
-    confirmed: true, // New bookings are confirmed by default
-    bookingFrom,
-    payments: payments || [],
-    totalPrice: totalPrice || 0,
-    createdAt: new Date().toISOString(),
-  };
+  try {
+    const booking = new Booking({
+      date,
+      slot,
+      selections,
+      customer: { name, phone },
+      confirmed: true,
+      bookingFrom,
+      payments: payments || [],
+      totalPrice: totalPrice || 0,
+    });
 
-  const res = await db.collection("bookings").insertOne(doc);
+    const res = await booking.save();
 
-  // Fire-and-forget WhatsApp notification to admin
-  sendBookingNotification({
-    bookingId: String(res.insertedId),
-    date,
-    slot,
-    selections,
-    customerName: name,
-    customerPhone: phone || "",
-    bookingFrom,
-    totalPrice,
-  }).catch(() => {});
+    // Fire-and-forget WhatsApp notification to admin
+    sendBookingNotification({
+      bookingId: String(res._id),
+      date,
+      slot,
+      selections,
+      customerName: name,
+      customerPhone: phone || "",
+      bookingFrom,
+      totalPrice,
+    }).catch(() => {});
 
-  return NextResponse.json({ ok: true, id: String(res.insertedId) });
+    return NextResponse.json({ ok: true, id: String(res._id) });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message || "Failed to save booking" },
+      { status: 400 },
+    );
+  }
 }
 
 export async function PATCH(req: Request) {
@@ -222,20 +228,15 @@ export async function PATCH(req: Request) {
     totalPrice,
   } = parsed.data;
 
-  let objectId: ObjectId;
-  try {
-    objectId = new ObjectId(id);
-  } catch {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
     return NextResponse.json({ error: "Invalid booking id" }, { status: 400 });
   }
+  const objectId = new mongoose.Types.ObjectId(id);
 
   const isAdmin = bookingFrom === "admin";
   if (!isAdmin && !isDateAllowed(date)) {
     return NextResponse.json({ error: "Date not allowed" }, { status: 400 });
   }
-
-  // Admin check for past slot is already handled in validator (CreateBookingSchema superRefine)
-  // but we should still be careful here if we ever change validator.
 
   const requestedConsoleIds = selections.map((s) => s.consoleId as ConsoleId);
   const uniqueRequested = new Set(requestedConsoleIds);
@@ -267,23 +268,21 @@ export async function PATCH(req: Request) {
     }
   }
 
-  const db = await getDb();
+  await connectToDB();
 
   // Get all confirmed bookings for this date, EXCLUDING current booking
-  const existingBookings = await db
-    .collection("bookings")
-    .find({
-      date,
-      confirmed: { $ne: false },
-      _id: { $ne: objectId },
-    })
-    .project({ _id: 0, slot: 1, selections: 1 })
-    .toArray();
+  const existingBookings = await Booking.find({
+    date,
+    confirmed: { $ne: false },
+    _id: { $ne: objectId },
+  })
+    .select("slot selections")
+    .lean();
 
   const bookedBySlot = new Map<string, Set<ConsoleId>>();
   for (const b of existingBookings) {
-    const startSlot: string = b.slot;
-    const sel = Array.isArray(b.selections) ? b.selections : [];
+    const startSlot: string = (b as any).slot;
+    const sel = Array.isArray(b.selections) ? (b.selections as any[]) : [];
     for (const s of sel) {
       if (!s?.consoleId) continue;
       const consoleId = s.consoleId as ConsoleId;
@@ -337,25 +336,31 @@ export async function PATCH(req: Request) {
   }
 
   const update = {
-    $set: {
-      date,
-      slot,
-      selections,
-      customer: { name, phone },
-      bookingFrom,
-      payments: payments || [],
-      totalPrice: totalPrice !== undefined ? totalPrice : undefined,
-      updatedAt: new Date().toISOString(),
-    },
+    date,
+    slot,
+    selections,
+    customer: { name, phone },
+    bookingFrom,
+    payments: payments || [],
+    totalPrice: totalPrice !== undefined ? totalPrice : undefined,
   };
 
-  const result = await db
-    .collection("bookings")
-    .updateOne({ _id: objectId }, update);
+  try {
+    const result = await Booking.updateOne(
+      { _id: objectId },
+      { $set: update },
+      { runValidators: true },
+    );
 
-  if (result.matchedCount === 0) {
-    return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    return NextResponse.json(
+      { error: err.message || "Failed to update booking" },
+      { status: 400 },
+    );
   }
-
-  return NextResponse.json({ ok: true });
 }

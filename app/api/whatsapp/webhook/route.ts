@@ -1,11 +1,4 @@
-/**
- * WhatsApp Webhook Handler
- * Handles incoming messages and routes to appropriate handlers
- */
-
 import { NextResponse } from "next/server";
-import { Db } from "mongodb";
-
 import {
   sendTextMessage,
   sendListMessage,
@@ -20,7 +13,8 @@ import {
   mergeSessionData,
   type SessionState,
 } from "@/lib/whatsapp-session";
-import { getDb } from "@/lib/mongodb";
+import { connectToDB } from "@/lib/mongodb";
+import Booking from "@/models/booking";
 import {
   CONSOLES,
   TV_COUNT,
@@ -37,12 +31,9 @@ const DEFAULT_DURATION = 60;
 
 const MAX_WA_BOOKINGS_PER_DAY = 3;
 
-async function countActiveWhatsAppBookings(
-  db: Db,
-  phone: string,
-  date: string,
-) {
-  return db.collection("bookings").countDocuments({
+async function countActiveWhatsAppBookings(phone: string, date: string) {
+  await connectToDB();
+  return Booking.countDocuments({
     date,
     bookingFrom: "whatsapp",
     confirmed: { $ne: false },
@@ -51,26 +42,23 @@ async function countActiveWhatsAppBookings(
 }
 
 async function getActiveWhatsAppBookingsForDates(
-  db: Db,
   phone: string,
   dates: string[],
 ) {
-  return db
-    .collection("bookings")
-    .find({
-      bookingFrom: "whatsapp",
-      confirmed: { $ne: false },
-      "customer.phone": phone,
-      date: { $in: dates },
-    })
-    .project({ _id: 0, date: 1, slot: 1, selections: 1 })
+  await connectToDB();
+  return Booking.find({
+    bookingFrom: "whatsapp",
+    confirmed: { $ne: false },
+    "customer.phone": phone,
+    date: { $in: dates },
+  })
+    .select("date slot selections")
     .sort({ date: 1, slot: 1 })
-    .toArray();
+    .lean();
 }
 
 /**
  * GET - Webhook verification endpoint
- * Meta sends a GET request to verify the webhook
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -81,7 +69,6 @@ export async function GET(req: Request) {
   const verifyToken = process.env.WHATSAPP_VERIFY_TOKEN;
 
   if (mode === "subscribe" && token === verifyToken) {
-    console.log("WhatsApp webhook verified");
     return new Response(challenge, { status: 200 });
   }
 
@@ -94,50 +81,31 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
-    // console.log("Incoming WhatsApp Webhook Body:", rawBody);
-
     let body;
     try {
       body = JSON.parse(rawBody);
     } catch (e) {
-      console.error("Failed to parse JSON body:", e);
       return NextResponse.json(
         { status: "error", message: "Invalid JSON" },
         { status: 400 },
       );
     }
 
-    // Parse the incoming message
     const message = parseWebhookMessage(body);
-    // console.log("Parsed WhatsApp Message:", message);
+    if (!message) return NextResponse.json({ status: "ok" });
 
-    // If no message (could be status update), acknowledge
-    if (!message) {
-      // console.log(
-      //   "No valid message found in webhook payload (likely a status update)",
-      // );
-      return NextResponse.json({ status: "ok" });
-    }
-
-    // Get or create session for this user
-    // console.log(`Getting session for ${message.from}`);
     const session = await getSession(message.from);
-    // console.log(`Current state for ${message.from}: ${session.state}`);
-
-    // Route based on session state and message type
     await handleMessage(message.from, session.state, session.data, message);
 
-    // console.log(`Successfully handled message from ${message.from}`);
     return NextResponse.json({ status: "ok" });
   } catch (error) {
     console.error("Webhook processing error:", error);
-    // Always return 200 to acknowledge receipt (Meta requires this)
     return NextResponse.json({ status: "error" });
   }
 }
 
 /**
- * Main message handler - routes based on state
+ * Main message handler
  */
 async function handleMessage(
   from: string,
@@ -147,13 +115,13 @@ async function handleMessage(
 ) {
   const text = message.text?.toLowerCase().trim() || "";
   const replyId = message.interactiveReplyId || "";
+
   if (replyId === "book_again" || replyId === "show_dates") {
     await clearSession(from);
     await handleIdle(from, "book");
     return;
   }
 
-  // Handle reset/cancel/ping commands anytime
   const resetKeywords = [
     "cancel",
     "reset",
@@ -166,7 +134,6 @@ async function handleMessage(
     "ping",
   ];
   if (resetKeywords.includes(text)) {
-    // console.log(`Command detected: ${text}`);
     if (text === "ping") {
       await sendTextMessage(from, "pong 🏓");
       return;
@@ -176,7 +143,6 @@ async function handleMessage(
     return;
   }
 
-  // Route based on state
   switch (state) {
     case "idle":
       await handleIdle(from, text);
@@ -207,7 +173,7 @@ async function handleMessage(
 }
 
 /**
- * Handle idle state - show welcome and date options
+ * Handle idle state
  */
 async function handleIdle(from: string, text: string) {
   const keywords = ["book", "hi", "hello", "hey", "start", "menu"];
@@ -222,16 +188,14 @@ async function handleIdle(from: string, text: string) {
   }
 
   const dates = [todayYmd(0), todayYmd(1), todayYmd(2)];
-  const db = await getDb();
-  const existing = await getActiveWhatsAppBookingsForDates(db, from, dates);
+  const existing = await getActiveWhatsAppBookingsForDates(from, dates);
 
   if (existing.length > 0) {
-    // group by date
     const byDate = new Map<string, any[]>();
     for (const b of existing) {
-      const arr = byDate.get(b.date) ?? [];
+      const arr = byDate.get((b as any).date) ?? [];
       arr.push(b);
-      byDate.set(b.date, arr);
+      byDate.set((b as any).date, arr);
     }
 
     let msg = `You already have bookings:\n`;
@@ -245,7 +209,6 @@ async function handleIdle(from: string, text: string) {
     const canBookAny = dates.some(
       (d) => (byDate.get(d)?.length ?? 0) < MAX_WA_BOOKINGS_PER_DAY,
     );
-
     if (canBookAny) {
       await sendButtonMessage(from, msg + `\nWant to book again?`, [
         { id: "book_again", title: "Book again" },
@@ -259,7 +222,6 @@ async function handleIdle(from: string, text: string) {
     }
   }
 
-  // start flow as normal
   await updateSession(from, "awaiting_date", {});
   await sendListMessage(
     from,
@@ -291,19 +253,13 @@ async function handleIdle(from: string, text: string) {
   );
 }
 
-/**
- * Handle date selection - show available slots
- */
 async function handleDateSelection(from: string, replyId: string) {
   if (!replyId.startsWith("date_")) {
     await sendTextMessage(from, "Please select a date from the list above.");
     return;
   }
-
   const date = replyId.replace("date_", "");
-
-  const db = await getDb();
-  const used = await countActiveWhatsAppBookings(db, from, date);
+  const used = await countActiveWhatsAppBookings(from, date);
 
   if (used >= MAX_WA_BOOKINGS_PER_DAY) {
     await sendTextMessage(
@@ -315,7 +271,6 @@ async function handleDateSelection(from: string, replyId: string) {
     return;
   }
 
-  // Get availability for this date
   const availability = await getAvailability(date);
   const availableSlots = availability.filter(
     (s) => !s.isPast && s.tvRemaining > 0,
@@ -332,29 +287,8 @@ async function handleDateSelection(from: string, replyId: string) {
 
   await updateSession(from, "awaiting_slot", { date, slotPage: 0 });
   await sendSlotListPage(from, date, 0);
-
-  // Group slots for better UX (show every 30 mins)
-  const slotRows = availableSlots
-    // .filter((_, i) => i % 2 === 0) // Show every 30 min slot
-    // .slice(0, 10) // Max 10 items per section
-    .map((s) => ({
-      id: `slot_${s.slot}`,
-      title: s.slot,
-      description: `${s.tvRemaining} TV${s.tvRemaining > 1 ? "s" : ""} available`,
-    }));
-
-  await sendListMessage(
-    from,
-    "Select Time Slot",
-    `📅 ${formatDateDisplay(date)}\n\nChoose your preferred time:\n\n(Send 'cancel' to start over)`,
-    "Select Time",
-    [{ title: "Available Slots", rows: slotRows }],
-  );
 }
 
-/**
- * Handle slot selection - show available consoles
- */
 async function handleSlotSelection(
   from: string,
   replyId: string,
@@ -362,22 +296,15 @@ async function handleSlotSelection(
 ) {
   if (replyId.startsWith("slotnav_")) {
     const page = Number(replyId.replace("slotnav_", ""));
-    if (!Number.isFinite(page) || page < 0) {
-      await sendTextMessage(from, "Please select a time from the list.");
-      return;
-    }
-    await sendSlotListPage(from, date, page);
+    if (Number.isFinite(page) && page >= 0)
+      await sendSlotListPage(from, date, page);
     return;
   }
-
   if (!replyId.startsWith("slot_")) {
     await sendTextMessage(from, "Please select a time slot from the list.");
     return;
   }
-
   const slot = replyId.replace("slot_", "");
-
-  // Get available consoles for this slot
   const availability = await getAvailability(date);
   const slotInfo = availability.find((s) => s.slot === slot);
 
@@ -393,13 +320,9 @@ async function handleSlotSelection(
   await mergeSessionData(from, { slot });
   await updateSession(from, "awaiting_console", { date, slot });
 
-  // Show available consoles as buttons (max 3)
   const consoleButtons = slotInfo.availableConsoleIds.slice(0, 3).map((id) => {
     const console = CONSOLES.find((c) => c.id === id);
-    return {
-      id: `console_${id}`,
-      title: console?.short || id,
-    };
+    return { id: `console_${id}`, title: console?.short || id };
   });
 
   await sendButtonMessage(
@@ -409,9 +332,6 @@ async function handleSlotSelection(
   );
 }
 
-/**
- * Handle console selection - ask for name
- */
 async function handleConsoleSelection(
   from: string,
   replyId: string,
@@ -422,7 +342,6 @@ async function handleConsoleSelection(
     await sendTextMessage(from, "Please select a console from the buttons.");
     return;
   }
-
   const consoleId = replyId.replace("console_", "") as ConsoleId;
   const consoleName =
     CONSOLES.find((c) => c.id === consoleId)?.name || consoleId;
@@ -433,16 +352,12 @@ async function handleConsoleSelection(
     consoleId,
     duration: DEFAULT_DURATION,
   });
-
   await sendTextMessage(
     from,
     `Great choice! 🎮 ${consoleName}\n\nPlease enter your name for the booking:\n\n(Send 'cancel' to start over)`,
   );
 }
 
-/**
- * Handle name input - show confirmation
- */
 async function handleNameInput(
   from: string,
   name: string,
@@ -455,14 +370,12 @@ async function handleNameInput(
     );
     return;
   }
-
   const { date, slot, consoleId, duration } = data as {
     date: string;
     slot: string;
     consoleId: ConsoleId;
     duration: number;
   };
-
   const consoleName =
     CONSOLES.find((c) => c.id === consoleId)?.name || consoleId;
 
@@ -473,16 +386,9 @@ async function handleNameInput(
     customerName: name,
     duration,
   });
-
   await sendButtonMessage(
     from,
-    `📋 *Booking Summary*\n\n` +
-      `📅 Date: ${formatDateDisplay(date)}\n` +
-      `⏰ Time: ${slot}\n` +
-      `🎮 Console: ${consoleName}\n` +
-      `⏱️ Duration: ${duration} mins\n` +
-      `👤 Name: ${name}\n\n` +
-      `Confirm your booking?\n\n(Send 'cancel' to start over)`,
+    `📋 *Booking Summary*\n\n📅 Date: ${formatDateDisplay(date)}\n⏰ Time: ${slot}\n🎮 Console: ${consoleName}\n⏱️ Duration: ${duration} mins\n👤 Name: ${name}\n\nConfirm your booking?\n\n(Send 'cancel' to start over)`,
     [
       { id: "confirm_yes", title: "✅ Confirm" },
       { id: "confirm_no", title: "❌ Cancel" },
@@ -490,9 +396,6 @@ async function handleNameInput(
   );
 }
 
-/**
- * Handle confirmation - create booking
- */
 async function handleConfirmation(
   from: string,
   replyId: string,
@@ -506,12 +409,10 @@ async function handleConfirmation(
     );
     return;
   }
-
   if (replyId !== "confirm_yes") {
     await sendTextMessage(from, "Please tap Confirm or Cancel.");
     return;
   }
-
   const { date, slot, consoleId, customerName, duration } = data as {
     date: string;
     slot: string;
@@ -519,9 +420,7 @@ async function handleConfirmation(
     customerName: string;
     duration: number;
   };
-
-  const db = await getDb();
-  const used = await countActiveWhatsAppBookings(db, from, date);
+  const used = await countActiveWhatsAppBookings(from, date);
 
   if (used >= MAX_WA_BOOKINGS_PER_DAY) {
     await sendTextMessage(
@@ -532,7 +431,6 @@ async function handleConfirmation(
     return;
   }
 
-  // Double-check availability before creating booking
   const availability = await getAvailability(date);
   const slotInfo = availability.find((s) => s.slot === slot);
 
@@ -545,33 +443,19 @@ async function handleConfirmation(
     return;
   }
 
-  // Create the booking
   try {
-    const db = await getDb();
-    const doc = {
+    const booking = new Booking({
       date,
       slot,
-      selections: [
-        {
-          consoleId,
-          duration,
-          players: 1,
-        },
-      ],
-      customer: {
-        name: customerName,
-        phone: from,
-      },
+      selections: [{ consoleId, duration, players: 1 }],
+      customer: { name: customerName, phone: from },
       confirmed: true,
       bookingFrom: "whatsapp",
-      createdAt: new Date().toISOString(),
-    };
+    });
+    const res = await booking.save();
 
-    const insertResult = await db.collection("bookings").insertOne(doc);
-
-    // Fire-and-forget WhatsApp notification to admin
     sendBookingNotification({
-      bookingId: String(insertResult.insertedId),
+      bookingId: String(res._id),
       date,
       slot,
       selections: [{ consoleId, duration, players: 1 }],
@@ -582,20 +466,12 @@ async function handleConfirmation(
 
     const consoleName =
       CONSOLES.find((c) => c.id === consoleId)?.name || consoleId;
-
     await clearSession(from);
     await sendTextMessage(
       from,
-      `✅ *Booking Confirmed!*\n\n` +
-        `📅 ${formatDateDisplay(date)}\n` +
-        `⏰ ${slot}\n` +
-        `🎮 ${consoleName}\n` +
-        `⏱️ ${duration} mins\n\n` +
-        `See you at ${CENTRE_NAME}! 🎮\n\n` +
-        `Send 'book' to make another reservation.`,
+      `✅ *Booking Confirmed!*\n\n📅 ${formatDateDisplay(date)}\n⏰ ${slot}\n🎮 ${consoleName}\n⏱️ ${duration} mins\n\nSee you at ${CENTRE_NAME}! 🎮\n\nSend 'book' to make another reservation.`,
     );
   } catch (error) {
-    console.error("Failed to create booking:", error);
     await sendTextMessage(
       from,
       "Sorry, something went wrong. Please try again or contact us directly.",
@@ -603,33 +479,23 @@ async function handleConfirmation(
   }
 }
 
-/**
- * Get availability for a date (reuses existing logic)
- */
 async function getAvailability(
   date: string,
   durationMinutes: number = DEFAULT_DURATION,
 ) {
-  const db = await getDb();
-  const bookings = await db
-    .collection("bookings")
-    .find({ date, confirmed: { $ne: false } })
-    .project({ _id: 0, slot: 1, selections: 1 })
-    .toArray();
-
-  // Map 15-min slot -> booked consoleIds during that 15-min
+  await connectToDB();
+  const bookings = await Booking.find({ date, confirmed: { $ne: false } })
+    .select("slot selections")
+    .lean();
   const bySlot = new Map<string, Set<ConsoleId>>();
 
   for (const b of bookings) {
-    const startSlot: string = b.slot;
-    const sel = Array.isArray(b.selections) ? b.selections : [];
-
+    const startSlot: string = (b as any).slot;
+    const sel = (b as any).selections || [];
     for (const s of sel) {
       if (!s?.consoleId) continue;
       const consoleId = s.consoleId as ConsoleId;
-      const dur = s.duration || 60;
-
-      const coveredSlots = getSlotsForDuration(startSlot, dur);
+      const coveredSlots = getSlotsForDuration(startSlot, s.duration || 60);
       for (const covered of coveredSlots) {
         const set = bySlot.get(covered) ?? new Set<ConsoleId>();
         set.add(consoleId);
@@ -643,23 +509,17 @@ async function getAvailability(
 
   return startSlots.map((start) => {
     const isPast = isSlotPast(date, start);
-
-    // ✅ UNION booked consoles across the whole requested duration
     const covered = getSlotsForDuration(start, durationMinutes);
     const bookedSet = new Set<ConsoleId>();
     for (const t of covered) {
       for (const cid of bySlot.get(t) ?? []) bookedSet.add(cid);
     }
-
-    const booked = Array.from(bookedSet);
-    const tvRemaining = isPast ? 0 : Math.max(0, TV_COUNT - booked.length);
-    const availableConsoleIds =
-      tvRemaining <= 0 ? [] : allIds.filter((id) => !bookedSet.has(id));
-
+    const tvRemaining = isPast ? 0 : Math.max(0, TV_COUNT - bookedSet.size);
     return {
       slot: start,
-      bookedConsoleIds: booked,
-      availableConsoleIds,
+      bookedConsoleIds: Array.from(bookedSet),
+      availableConsoleIds:
+        tvRemaining <= 0 ? [] : allIds.filter((id) => !bookedSet.has(id)),
       tvRemaining,
       isPast,
     };

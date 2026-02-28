@@ -1,4 +1,5 @@
-import { getDb } from "@/lib/mongodb";
+import { connectToDB } from "@/lib/mongodb";
+import Booking from "@/models/booking";
 import {
   CONSOLES,
   TV_COUNT,
@@ -29,13 +30,11 @@ export async function getAvailability(
     throw new Error("Date not allowed");
   }
 
-  const db = await getDb();
+  await connectToDB();
   // Only fetch confirmed bookings (not cancelled)
-  const bookings = await db
-    .collection("bookings")
-    .find({ date, confirmed: { $ne: false } })
-    .project({ _id: 0, slot: 1, selections: 1 })
-    .toArray();
+  const bookings = await Booking.find({ date, confirmed: { $ne: false } })
+    .select("slot selections")
+    .lean();
 
   // Build a map: slot -> Set of console IDs booked for that slot
   const bySlot = new Map<string, Set<ConsoleId>>();

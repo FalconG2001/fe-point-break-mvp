@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { isAdminAllowed, getDb } from "@/lib/mongodb";
+import { connectToDB } from "@/lib/mongodb";
+import Booking from "@/models/booking";
+import mongoose from "mongoose";
+import { isAdminAllowed } from "@/lib/mongodb";
 import { getAdminBookings } from "@/lib/admin-actions";
-import { ObjectId } from "mongodb";
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -61,17 +63,16 @@ export async function PATCH(req: Request) {
     );
   }
 
-  let objectId: ObjectId;
-  try {
-    objectId = new ObjectId(bookingId);
-  } catch {
+  if (!mongoose.Types.ObjectId.isValid(bookingId)) {
     return NextResponse.json({ error: "Invalid bookingId" }, { status: 400 });
   }
+  const objectId = new mongoose.Types.ObjectId(bookingId);
 
-  const db = await getDb();
-  const result = await db
-    .collection("bookings")
-    .updateOne({ _id: objectId }, { $set: { confirmed } });
+  await connectToDB();
+  const result = await Booking.updateOne(
+    { _id: objectId },
+    { $set: { confirmed } },
+  );
 
   if (result.matchedCount === 0) {
     return NextResponse.json({ error: "Booking not found" }, { status: 404 });

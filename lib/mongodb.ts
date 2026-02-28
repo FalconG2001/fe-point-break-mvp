@@ -1,4 +1,5 @@
-import { MongoClient, Db } from "mongodb";
+import mongoose from "mongoose";
+import AdminAllowlist from "@/models/admin-allowlist";
 
 const uri = process.env.MONGODB_URI;
 const dbName = process.env.MONGODB_DB;
@@ -6,24 +7,22 @@ const dbName = process.env.MONGODB_DB;
 if (!uri) throw new Error("Missing MONGODB_URI");
 if (!dbName) throw new Error("Missing MONGODB_DB");
 
-let cachedClient: MongoClient | null = null;
-let cachedDb: Db | null = null;
+export const connectToDB = async () => {
+  if (mongoose.connection.readyState >= 1) return;
 
-export async function getDb(): Promise<Db> {
-  if (cachedDb) return cachedDb;
-
-  if (!cachedClient) {
-    cachedClient = new MongoClient(uri!);
-    await cachedClient.connect();
+  try {
+    await mongoose.connect(uri);
+    console.log("✅ Connected to MongoDB");
+  } catch (err) {
+    console.error("❌ MongoDB connection error:", err);
+    throw err;
   }
-
-  cachedDb = cachedClient.db(dbName);
-  return cachedDb;
-}
+};
 
 export async function isAdminAllowed(email: string): Promise<boolean> {
-  const db = await getDb();
-  const col = db.collection("admin_allowlist");
-  const found = await col.findOne({ email: email.toLowerCase() });
+  await connectToDB();
+  const found = await AdminAllowlist.findOne({
+    email: email.toLowerCase(),
+  }).lean();
   return !!found;
 }
