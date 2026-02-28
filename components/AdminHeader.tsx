@@ -49,6 +49,17 @@ export default function AdminHeader() {
             >
               Archive
             </Link>
+            <Link
+              href="/admin/games"
+              style={{
+                textDecoration: "none",
+                color: pathname === "/admin/games" ? "#000" : "#71717a",
+                fontSize: "0.85rem",
+                fontWeight: pathname === "/admin/games" ? 800 : 500,
+              }}
+            >
+              Games
+            </Link>
           </Stack>
         </Stack>
       </Stack>
