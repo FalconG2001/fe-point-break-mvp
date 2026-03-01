@@ -64,7 +64,7 @@ export const CreateBookingSchema = z
     bookingFrom: BookingSourceSchema.optional().default("website"),
     payments: z.array(PaymentSchema).optional(),
     totalPrice: z.number().min(0).optional(),
-    userType: z.enum(["normal", "college", "school"]).optional(),
+    userType: z.enum(["normal", "student"]).optional(),
   })
   .superRefine((val, ctx) => {
     const isAdmin = val.bookingFrom === "admin";

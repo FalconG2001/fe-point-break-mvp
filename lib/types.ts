@@ -13,7 +13,7 @@ export type AdminBooking = {
   date: string;
   slot: string;
   selections: SelectionWithDuration[];
-  customer: { name: string; phone: string };
+  customer: { name: string; phone: string; userType: "normal" | "student" };
   confirmed: boolean;
   createdAt: string;
   bookingFrom?: "website" | "whatsapp" | "admin";

@@ -448,7 +448,7 @@ async function handleConfirmation(
       date,
       slot,
       selections: [{ consoleId, duration, players: 1 }],
-      customer: { name: customerName, phone: from },
+      customer: { name: customerName, phone: from, userType: "normal" },
       confirmed: true,
       bookingFrom: "whatsapp",
     });

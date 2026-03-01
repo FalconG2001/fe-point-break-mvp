@@ -1,6 +1,6 @@
 import { Schema, model, models } from "mongoose";
 
-export type PricingUserType = "normal" | "college" | "school"; // student = college/school
+export type PricingUserType = "normal" | "student";
 export type PricingCategory = "session" | "console_rent";
 export type PricingType = "per_person" | "fixed_total";
 
@@ -8,7 +8,7 @@ const pricingSchema = new Schema(
   {
     userType: {
       type: String,
-      enum: ["normal", "college", "school"],
+      enum: ["normal", "student"],
       required: true,
       index: true,
     },

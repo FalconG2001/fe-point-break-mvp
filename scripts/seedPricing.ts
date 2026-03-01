@@ -6,7 +6,7 @@ const uri = process.env.MONGODB_URI;
 if (!uri) throw new Error("Missing MONGODB_URI");
 
 type Row = {
-  userType: "normal" | "college" | "school";
+  userType: "normal" | "student";
   category: "session" | "console_rent";
   durationMinutes: 30 | 60 | 90 | 120 | 150 | 180;
   minPlayers: number;
@@ -165,7 +165,7 @@ async function main() {
   await mongoose.connect(uri!);
   console.log("✅ Connected");
 
-  // Student prices (college/school)
+  // Student prices
   const student = {
     session: {
       "30": { p1: 60, p2: 50, p34: 50, p5: 50 },
@@ -209,8 +209,7 @@ async function main() {
 
   const rows: Row[] = [
     ...rowsForUser("normal", normal),
-    ...rowsForUser("college", student),
-    ...rowsForUser("school", student),
+    ...rowsForUser("student", student),
   ];
 
   // wipe + insert

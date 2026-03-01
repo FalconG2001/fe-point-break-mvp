@@ -52,10 +52,10 @@ interface Props {
       duration: number;
       players: number;
     }>;
-    customer: { name: string; phone: string };
+    customer: { name: string; phone: string; userType: "normal" | "student" };
     payments?: Array<{ type: number; amount: number }>;
     totalPrice?: number;
-    userType?: "normal" | "college";
+    userType?: "normal" | "student";
   };
   pricing?: any[];
 }
@@ -79,8 +79,8 @@ export default function AdminCreateBookingDialog({
   >([{ consoleId: "", duration: 60, players: 1 }]);
   const [name, setName] = React.useState("");
   const [phone, setPhone] = React.useState("");
-  const [userType, setUserType] = React.useState<"normal" | "college">(
-    "normal",
+  const [userType, setUserType] = React.useState<"normal" | "student">(
+    initialData?.customer?.userType || "normal",
   );
   const [totalPrice, setTotalPrice] = React.useState<number | "">("");
   const [isPriceModified, setIsPriceModified] = React.useState(false);
@@ -117,7 +117,7 @@ export default function AdminCreateBookingDialog({
         }
         setName(initialData.customer?.name || "");
         setPhone(initialData.customer?.phone || "");
-        setUserType(initialData.userType || "normal");
+        setUserType(initialData.customer?.userType || "normal");
         setTotalPrice(
           initialData.totalPrice !== undefined ? initialData.totalPrice : "",
         );
@@ -167,9 +167,7 @@ export default function AdminCreateBookingDialog({
       if (!s.consoleId) continue;
 
       const row = pricing.find((p) => {
-        const userOk =
-          p.userType === userType ||
-          (userType === "college" && p.userType === "school");
+        const userOk = p.userType === userType;
         return (
           userOk &&
           p.category === "session" &&
@@ -449,7 +447,7 @@ export default function AdminCreateBookingDialog({
               row
               value={userType}
               onChange={(e) =>
-                setUserType(e.target.value as "normal" | "college")
+                setUserType(e.target.value as "normal" | "student")
               }
             >
               <FormControlLabel
@@ -458,7 +456,7 @@ export default function AdminCreateBookingDialog({
                 label={<Typography variant="body2">Normal</Typography>}
               />
               <FormControlLabel
-                value="college"
+                value="student"
                 control={<Radio size="small" />}
                 label={<Typography variant="body2">Student</Typography>}
               />

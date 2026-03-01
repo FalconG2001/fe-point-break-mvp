@@ -42,7 +42,7 @@ interface AvailabilityResponse {
 }
 
 type PricingRow = {
-  userType: "normal" | "college" | "school";
+  userType: "normal" | "student";
   category: "session" | "console_rent";
   durationMinutes: number;
   minPlayers: number;
@@ -177,10 +177,10 @@ export default function BookingFlow({
   const [selection, setSelection] = React.useState<SelectionState>({});
   const [showFullSlots, setShowFullSlots] = React.useState(false);
 
-  const [userType, setUserType] = React.useState<"normal" | "college">(
+  const [userType, setUserType] = React.useState<"normal" | "student">(
     "normal",
   );
-  // college is your "student" mode (college + school are same price in DB)
+  // student is your student mode
 
   const counts = React.useMemo(() => {
     const s = availability ?? [];
@@ -237,9 +237,7 @@ export default function BookingFlow({
 
     for (const s of selectedConsoles) {
       const row = table.find((p) => {
-        const userOk =
-          p.userType === userType ||
-          (userType === "college" && p.userType === "school");
+        const userOk = p.userType === userType;
         return (
           userOk &&
           p.category === "session" &&
@@ -633,7 +631,7 @@ export default function BookingFlow({
                         row
                         value={userType}
                         onChange={(e) =>
-                          setUserType(e.target.value as "normal" | "college")
+                          setUserType(e.target.value as "normal" | "student")
                         }
                       >
                         <FormControlLabel
@@ -646,7 +644,7 @@ export default function BookingFlow({
                           }
                         />
                         <FormControlLabel
-                          value="college"
+                          value="student"
                           control={<Radio size="small" color="primary" />}
                           label={
                             <Typography variant="body2" fontWeight={800}>

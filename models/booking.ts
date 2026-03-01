@@ -26,6 +26,7 @@ export interface IBooking extends Document {
   customer: {
     name: string;
     phone?: string;
+    userType?: "normal" | "student";
   };
   confirmed: boolean;
   bookingFrom: "website" | "whatsapp" | "admin";
@@ -102,6 +103,11 @@ const BookingSchema = new Schema<IBooking>(
       phone: {
         type: String,
         match: /^[0-9+()\-\s]*$/,
+      },
+      userType: {
+        type: String,
+        enum: ["normal", "student"],
+        default: "normal",
       },
     },
     confirmed: {

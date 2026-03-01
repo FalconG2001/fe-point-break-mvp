@@ -18,7 +18,7 @@ import { isAdminAllowed } from "@/lib/admin-actions";
 import Pricing from "@/models/pricing";
 
 async function computeTotalPrice(opts: {
-  userType: "normal" | "college" | "school";
+  userType: "normal" | "student";
   selections: Array<{ players: number; duration: number }>;
 }) {
   const { userType, selections } = opts;
@@ -26,7 +26,7 @@ async function computeTotalPrice(opts: {
   const durations = Array.from(
     new Set(selections.map((s) => Number(s.duration))),
   );
-  const userTypes = userType === "college" ? ["college", "school"] : [userType];
+  const userTypes = [userType];
 
   const rows = await Pricing.find({
     userType: { $in: userTypes },
@@ -77,11 +77,11 @@ export async function POST(req: Request) {
   const { date, slot, selections, name, phone } = parsed.data;
   const clientUserType = parsed?.data?.userType || "normal";
 
-  // website users can only be normal or college
+  // website users can only be normal or student
   const userType = adminAllowed
     ? clientUserType
-    : clientUserType === "college"
-      ? "college"
+    : clientUserType === "student"
+      ? "student"
       : "normal";
 
   const isAdmin = bookingFrom === "admin";
@@ -222,7 +222,7 @@ export async function POST(req: Request) {
       date,
       slot,
       selections,
-      customer: { name, phone },
+      customer: { name, phone, userType },
       confirmed: true,
       bookingFrom,
       payments: payments || [],
@@ -281,6 +281,7 @@ export async function PATCH(req: Request) {
     selections,
     name,
     phone,
+    userType,
     bookingFrom,
     payments,
     totalPrice,
@@ -397,7 +398,7 @@ export async function PATCH(req: Request) {
     date,
     slot,
     selections,
-    customer: { name, phone },
+    customer: { name, phone, userType },
     bookingFrom,
     payments: payments || [],
     totalPrice: totalPrice !== undefined ? totalPrice : undefined,
