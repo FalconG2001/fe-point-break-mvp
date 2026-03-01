@@ -81,6 +81,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const rawBody = await req.text();
+    console.log("Received webhook message:", rawBody);
     let body;
     try {
       body = JSON.parse(rawBody);
