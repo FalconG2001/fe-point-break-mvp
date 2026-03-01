@@ -38,7 +38,6 @@ export default function TimeSlotPicker({
     if (!showFull) s = s.filter((x) => x.availableConsoleIds.length > 0);
 
     // Put “best” options first
-    s.sort((a, b) => b.tvCapacityRemaining - a.tvCapacityRemaining);
     return s;
   }, [slots, showFull, showPast]);
 
