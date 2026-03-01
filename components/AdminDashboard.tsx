@@ -31,9 +31,13 @@ import { useAdmin } from "./AdminContext";
 
 interface AdminDashboardProps {
   initialData?: ApiResp;
+  pricing?: any[];
 }
 
-export default function AdminDashboard({ initialData }: AdminDashboardProps) {
+export default function AdminDashboard({
+  initialData,
+  pricing,
+}: AdminDashboardProps) {
   const [date, setDate] = React.useState(initialData?.date || todayYmd(0));
   const [data, setData] = React.useState<ApiResp | null>(initialData || null);
   const [loading, setLoading] = React.useState(false);
@@ -528,6 +532,7 @@ export default function AdminDashboard({ initialData }: AdminDashboardProps) {
         }}
         defaultDate={date}
         initialData={editingBooking || undefined}
+        pricing={pricing}
       />
 
       <Dialog

@@ -39,11 +39,13 @@ import debounce from "lodash/debounce";
 interface AllBookingsProps {
   onSuccess?: () => void;
   initialData?: ApiResp;
+  pricing?: any[];
 }
 
 export default function AllBookings({
   onSuccess,
   initialData,
+  pricing,
 }: AllBookingsProps) {
   const { isCreateBookingOpen, setCreateBookingOpen, refreshTrigger } =
     useAdmin();
@@ -532,6 +534,7 @@ export default function AllBookings({
           if (onSuccess) onSuccess();
         }}
         initialData={editingBooking || undefined}
+        pricing={pricing}
       />
 
       <Dialog

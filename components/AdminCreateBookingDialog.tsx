@@ -33,6 +33,10 @@ import {
   type DurationMinutes,
   todayYmd,
 } from "@/lib/config";
+import Radio from "@mui/material/Radio";
+import RadioGroup from "@mui/material/RadioGroup";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import FormLabel from "@mui/material/FormLabel";
 
 interface Props {
   open: boolean;
@@ -51,7 +55,9 @@ interface Props {
     customer: { name: string; phone: string };
     payments?: Array<{ type: number; amount: number }>;
     totalPrice?: number;
+    userType?: "normal" | "college";
   };
+  pricing?: any[];
 }
 
 export default function AdminCreateBookingDialog({
@@ -60,6 +66,7 @@ export default function AdminCreateBookingDialog({
   onSuccess,
   defaultDate,
   initialData,
+  pricing,
 }: Props) {
   const [date, setDate] = React.useState(defaultDate || todayYmd(0));
   const [slot, setSlot] = React.useState("");
@@ -72,7 +79,11 @@ export default function AdminCreateBookingDialog({
   >([{ consoleId: "", duration: 60, players: 1 }]);
   const [name, setName] = React.useState("");
   const [phone, setPhone] = React.useState("");
+  const [userType, setUserType] = React.useState<"normal" | "college">(
+    "normal",
+  );
   const [totalPrice, setTotalPrice] = React.useState<number | "">("");
+  const [isPriceModified, setIsPriceModified] = React.useState(false);
   const [cashPaid, setCashPaid] = React.useState<number | "">("");
   const [gpayPaid, setGpayPaid] = React.useState<number | "">("");
   const [loading, setLoading] = React.useState(false);
@@ -106,9 +117,11 @@ export default function AdminCreateBookingDialog({
         }
         setName(initialData.customer?.name || "");
         setPhone(initialData.customer?.phone || "");
+        setUserType(initialData.userType || "normal");
         setTotalPrice(
           initialData.totalPrice !== undefined ? initialData.totalPrice : "",
         );
+        setIsPriceModified(true); // Don't auto-calc if editing existing
         const cashAmt = initialData.payments?.find((p) => p.type === 2)?.amount;
         const gpayAmt = initialData.payments?.find((p) => p.type === 1)?.amount;
         setCashPaid(cashAmt !== undefined ? cashAmt : "");
@@ -119,13 +132,67 @@ export default function AdminCreateBookingDialog({
         setSelections([{ consoleId: "", duration: 60, players: 1 }]);
         setName("");
         setPhone("");
+        setUserType("normal");
         setTotalPrice("");
+        setIsPriceModified(false); // Reset to allow auto-calc for NEW bookings
         setCashPaid("");
         setGpayPaid("");
       }
       setError("");
     }
   }, [open, defaultDate, initialData]);
+
+  // Reset isPriceModified when selections or userType change to allow re-calculation,
+  // but only if we ARE in a state where we want auto-sync (e.g. not immediately after opening an edit)
+  const lastDeps = React.useRef({ selections, userType });
+  React.useEffect(() => {
+    const depsChanged =
+      JSON.stringify(lastDeps.current.selections) !==
+        JSON.stringify(selections) || lastDeps.current.userType !== userType;
+
+    if (depsChanged && open) {
+      setIsPriceModified(false);
+    }
+    lastDeps.current = { selections, userType };
+  }, [selections, userType, open]);
+
+  // Auto-fill pricing logic
+  React.useEffect(() => {
+    if (isPriceModified || !pricing || pricing.length === 0) return;
+
+    let total = 0;
+    let missing = false;
+
+    for (const s of selections) {
+      if (!s.consoleId) continue;
+
+      const row = pricing.find((p) => {
+        const userOk =
+          p.userType === userType ||
+          (userType === "college" && p.userType === "school");
+        return (
+          userOk &&
+          p.category === "session" &&
+          p.durationMinutes === Number(s.duration) &&
+          s.players >= p.minPlayers &&
+          s.players <= p.maxPlayers
+        );
+      });
+
+      if (!row) {
+        missing = true;
+        break;
+      }
+
+      const line =
+        row.pricingType === "per_person" ? row.price * s.players : row.price;
+      total += line;
+    }
+
+    if (!missing && total > 0) {
+      setTotalPrice(total);
+    }
+  }, [selections, userType, pricing, isPriceModified]);
 
   const handleSubmit = async () => {
     const hasInvalidSelection = selections.some((s) => !s.consoleId);
@@ -146,6 +213,7 @@ export default function AdminCreateBookingDialog({
         selections: selections.filter((s) => s.consoleId !== ""),
         name,
         phone,
+        userType,
         totalPrice: totalPrice === "" ? 0 : Number(totalPrice),
         bookingFrom: "admin",
         payments: [
@@ -339,7 +407,7 @@ export default function AdminCreateBookingDialog({
                         newSels[index].players = Number(e.target.value) || 1;
                         setSelections(newSels);
                       }}
-                      inputProps={{ min: 1, max: 6 }}
+                      // inputProps={{ min: 1, max: 6 }}
                       fullWidth
                     />
                   </Stack>
@@ -365,15 +433,55 @@ export default function AdminCreateBookingDialog({
             onChange={(e) => setPhone(e.target.value)}
           />
 
+          <FormControl component="fieldset">
+            <FormLabel
+              component="legend"
+              sx={{
+                fontWeight: 700,
+                fontSize: "0.85rem",
+                mb: 0.5,
+                color: "text.primary",
+              }}
+            >
+              Pricing Type
+            </FormLabel>
+            <RadioGroup
+              row
+              value={userType}
+              onChange={(e) =>
+                setUserType(e.target.value as "normal" | "college")
+              }
+            >
+              <FormControlLabel
+                value="normal"
+                control={<Radio size="small" />}
+                label={<Typography variant="body2">Normal</Typography>}
+              />
+              <FormControlLabel
+                value="college"
+                control={<Radio size="small" />}
+                label={<Typography variant="body2">Student</Typography>}
+              />
+            </RadioGroup>
+          </FormControl>
+
           <TextField
             size="small"
-            label="Total Price (₹)"
+            label={isPriceModified ? "Total Price (₹)" : "Estimated Price (₹)"}
             type="number"
             value={totalPrice}
-            onChange={(e) =>
-              setTotalPrice(e.target.value === "" ? "" : Number(e.target.value))
-            }
+            onChange={(e) => {
+              setTotalPrice(
+                e.target.value === "" ? "" : Number(e.target.value),
+              );
+              setIsPriceModified(true);
+            }}
             required
+            helperText={
+              !isPriceModified && totalPrice !== ""
+                ? "Auto-calculated based on selections"
+                : ""
+            }
           />
 
           <Stack direction="row" spacing={2}>
