@@ -14,6 +14,12 @@ import MenuItem from "@mui/material/MenuItem";
 import Stack from "@mui/material/Stack";
 import Alert from "@mui/material/Alert";
 import CircularProgress from "@mui/material/CircularProgress";
+import IconButton from "@mui/material/IconButton";
+import DeleteIcon from "@mui/icons-material/Delete";
+import AddIcon from "@mui/icons-material/Add";
+import Typography from "@mui/material/Typography";
+import Divider from "@mui/material/Divider";
+import Box from "@mui/material/Box";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { TimePicker } from "@mui/x-date-pickers/TimePicker";
@@ -26,7 +32,6 @@ import {
   type ConsoleId,
   type DurationMinutes,
   todayYmd,
-  getStartSlotsForDate,
 } from "@/lib/config";
 
 interface Props {
@@ -58,9 +63,13 @@ export default function AdminCreateBookingDialog({
 }: Props) {
   const [date, setDate] = React.useState(defaultDate || todayYmd(0));
   const [slot, setSlot] = React.useState("");
-  const [consoleId, setConsoleId] = React.useState<ConsoleId | "">("");
-  const [duration, setDuration] = React.useState<DurationMinutes>(60);
-  const [players, setPlayers] = React.useState(1);
+  const [selections, setSelections] = React.useState<
+    Array<{
+      consoleId: ConsoleId | "";
+      duration: DurationMinutes;
+      players: number;
+    }>
+  >([{ consoleId: "", duration: 60, players: 1 }]);
   const [name, setName] = React.useState("");
   const [phone, setPhone] = React.useState("");
   const [totalPrice, setTotalPrice] = React.useState<number | "">("");
@@ -84,11 +93,16 @@ export default function AdminCreateBookingDialog({
       if (initialData) {
         setDate(initialData.date);
         setSlot(initialData.slot);
-        const sel = initialData.selections?.[0];
-        if (sel) {
-          setConsoleId(sel.consoleId as ConsoleId);
-          setDuration(sel.duration as DurationMinutes);
-          setPlayers(sel.players);
+        if (initialData.selections && initialData.selections.length > 0) {
+          setSelections(
+            initialData.selections.map((s) => ({
+              consoleId: s.consoleId as ConsoleId,
+              duration: s.duration as DurationMinutes,
+              players: s.players,
+            })),
+          );
+        } else {
+          setSelections([{ consoleId: "", duration: 60, players: 1 }]);
         }
         setName(initialData.customer?.name || "");
         setPhone(initialData.customer?.phone || "");
@@ -102,9 +116,7 @@ export default function AdminCreateBookingDialog({
       } else {
         setDate(defaultDate || todayYmd(0));
         setSlot("10:00");
-        setConsoleId("");
-        setDuration(60);
-        setPlayers(1);
+        setSelections([{ consoleId: "", duration: 60, players: 1 }]);
         setName("");
         setPhone("");
         setTotalPrice("");
@@ -116,8 +128,11 @@ export default function AdminCreateBookingDialog({
   }, [open, defaultDate, initialData]);
 
   const handleSubmit = async () => {
-    if (!slot || !consoleId || !name) {
-      setError("Please fill in name, slot and console");
+    const hasInvalidSelection = selections.some((s) => !s.consoleId);
+    if (!slot || hasInvalidSelection || !name) {
+      setError(
+        "Please fill in name, slot and pick consoles for all selections",
+      );
       return;
     }
 
@@ -128,7 +143,7 @@ export default function AdminCreateBookingDialog({
       const payload = {
         date,
         slot,
-        selections: [{ consoleId, duration, players }],
+        selections: selections.filter((s) => s.consoleId !== ""),
         name,
         phone,
         totalPrice: totalPrice === "" ? 0 : Number(totalPrice),
@@ -221,44 +236,119 @@ export default function AdminCreateBookingDialog({
             />
           </LocalizationProvider>
 
-          <FormControl fullWidth size="small">
-            <InputLabel>Console</InputLabel>
-            <Select
-              value={consoleId}
-              label="Console"
-              onChange={(e) => setConsoleId(e.target.value as ConsoleId)}
+          <Box sx={{ mb: 1 }}>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{ mb: 1 }}
             >
-              {CONSOLES.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+              <Typography variant="subtitle2" fontWeight={700}>
+                Consoles
+              </Typography>
+              <Button
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={() =>
+                  setSelections([
+                    ...selections,
+                    { consoleId: "", duration: 60, players: 1 },
+                  ])
+                }
+              >
+                Add Console
+              </Button>
+            </Stack>
 
-          <FormControl fullWidth size="small">
-            <InputLabel>Duration</InputLabel>
-            <Select
-              value={duration}
-              label="Duration"
-              onChange={(e) => setDuration(e.target.value as DurationMinutes)}
-            >
-              {DURATION_OPTIONS.map((d) => (
-                <MenuItem key={d} value={d}>
-                  {DURATION_LABELS[d]}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+            <Stack spacing={2}>
+              {selections.map((sel, index) => (
+                <Stack
+                  key={index}
+                  spacing={1}
+                  sx={{
+                    p: 1.5,
+                    border: "1px solid rgba(0,0,0,0.1)",
+                    borderRadius: 1,
+                    position: "relative",
+                  }}
+                >
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Console</InputLabel>
+                      <Select
+                        value={sel.consoleId}
+                        label="Console"
+                        onChange={(e) => {
+                          const newSels = [...selections];
+                          newSels[index].consoleId = e.target
+                            .value as ConsoleId;
+                          setSelections(newSels);
+                        }}
+                      >
+                        {CONSOLES.map((c) => (
+                          <MenuItem key={c.id} value={c.id}>
+                            {c.name}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    {selections.length > 1 && (
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => {
+                          const newSels = selections.filter(
+                            (_, i) => i !== index,
+                          );
+                          setSelections(newSels);
+                        }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    )}
+                  </Stack>
 
-          <TextField
-            size="small"
-            label="Number of Players"
-            type="number"
-            value={players}
-            onChange={(e) => setPlayers(Number(e.target.value) || 1)}
-            inputProps={{ min: 1, max: 6 }}
-          />
+                  <Stack direction="row" spacing={1}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Duration</InputLabel>
+                      <Select
+                        value={sel.duration}
+                        label="Duration"
+                        onChange={(e) => {
+                          const newSels = [...selections];
+                          newSels[index].duration = e.target
+                            .value as DurationMinutes;
+                          setSelections(newSels);
+                        }}
+                      >
+                        {DURATION_OPTIONS.map((d) => (
+                          <MenuItem key={d} value={d}>
+                            {DURATION_LABELS[d]}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+
+                    <TextField
+                      size="small"
+                      label="Players"
+                      type="number"
+                      value={sel.players}
+                      onChange={(e) => {
+                        const newSels = [...selections];
+                        newSels[index].players = Number(e.target.value) || 1;
+                        setSelections(newSels);
+                      }}
+                      inputProps={{ min: 1, max: 6 }}
+                      fullWidth
+                    />
+                  </Stack>
+                </Stack>
+              ))}
+            </Stack>
+          </Box>
+
+          <Divider />
 
           <TextField
             size="small"

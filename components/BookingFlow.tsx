@@ -16,6 +16,11 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Grid from "@mui/material/Grid";
 import Chip from "@mui/material/Chip";
 import TextField from "@mui/material/TextField";
+import Radio from "@mui/material/Radio";
+import RadioGroup from "@mui/material/RadioGroup";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import FormControl from "@mui/material/FormControl";
+import FormLabel from "@mui/material/FormLabel";
 
 import DateTabs from "./DateTabs";
 import TimeSlotPicker from "./TimeSlotPicker";
@@ -36,9 +41,20 @@ interface AvailabilityResponse {
   slots: AvailabilitySlot[];
 }
 
+type PricingRow = {
+  userType: "normal" | "college" | "school";
+  category: "session" | "console_rent";
+  durationMinutes: number;
+  minPlayers: number;
+  maxPlayers: number;
+  pricingType: "per_person" | "fixed_total";
+  price: number;
+};
+
 interface BookingFlowProps {
   initialData?: AvailabilityResponse;
   games?: any[];
+  pricing?: PricingRow[];
 }
 
 function TabPanel(props: {
@@ -54,7 +70,104 @@ function TabPanel(props: {
   );
 }
 
-export default function BookingFlow({ initialData, games }: BookingFlowProps) {
+function SummaryBlock({
+  date,
+  slot,
+  selectedConsoles,
+  estimateTotal,
+  estimateMissing,
+  userTypeLabel,
+}: {
+  date: string;
+  slot: string | null;
+  selectedConsoles: Array<{
+    consoleId: ConsoleId;
+    players: number;
+    duration: DurationMinutes;
+  }>;
+  estimateTotal: number;
+  estimateMissing: boolean;
+  userTypeLabel: string;
+}) {
+  return (
+    <Stack spacing={2}>
+      <Typography fontWeight={900}>Your booking</Typography>
+
+      <Stack spacing={0.5}>
+        <Typography variant="caption" color="text.secondary">
+          Pricing
+        </Typography>
+        <Typography fontWeight={800}>{userTypeLabel}</Typography>
+        {userTypeLabel === "Student" && (
+          <Typography variant="caption" color="error" fontWeight={700}>
+            Note: You must show a school or college ID
+          </Typography>
+        )}
+      </Stack>
+
+      <Stack spacing={0.5}>
+        <Typography variant="caption" color="text.secondary">
+          Date
+        </Typography>
+        <Typography fontWeight={800}>{date}</Typography>
+      </Stack>
+
+      <Stack spacing={0.5}>
+        <Typography variant="caption" color="text.secondary">
+          Time
+        </Typography>
+        <Typography fontWeight={800}>
+          {slot ? slot : "Not picked yet"}
+        </Typography>
+      </Stack>
+
+      <Stack spacing={0.8}>
+        <Typography variant="caption" color="text.secondary">
+          Consoles
+        </Typography>
+
+        {selectedConsoles.length === 0 ? (
+          <Typography variant="body2" color="text.secondary">
+            None selected
+          </Typography>
+        ) : (
+          <Stack spacing={1}>
+            {selectedConsoles.map((s) => (
+              <Chip
+                key={s.consoleId}
+                label={`${CONSOLES.find((c) => c.id === s.consoleId)?.name ?? s.consoleId} • ${s.players}P • ${s.duration}m`}
+                sx={{ borderRadius: 1, fontWeight: 800 }}
+              />
+            ))}
+          </Stack>
+        )}
+      </Stack>
+
+      <Divider />
+
+      <Stack spacing={0.5}>
+        <Typography variant="caption" color="text.secondary">
+          Estimated total
+        </Typography>
+        {estimateMissing ? (
+          <Typography fontWeight={900} color="error">
+            Price not found for one selection
+          </Typography>
+        ) : (
+          <Typography fontWeight={900} sx={{ fontSize: "1.1rem" }}>
+            ₹{estimateTotal}
+          </Typography>
+        )}
+      </Stack>
+    </Stack>
+  );
+}
+
+export default function BookingFlow({
+  initialData,
+  games,
+  pricing,
+}: BookingFlowProps) {
   const [date, setDate] = React.useState(initialData?.date || todayYmd(0));
   const [availability, setAvailability] = React.useState<
     AvailabilitySlot[] | null
@@ -63,6 +176,11 @@ export default function BookingFlow({ initialData, games }: BookingFlowProps) {
   const [slot, setSlot] = React.useState<string | null>(null);
   const [selection, setSelection] = React.useState<SelectionState>({});
   const [showFullSlots, setShowFullSlots] = React.useState(false);
+
+  const [userType, setUserType] = React.useState<"normal" | "college">(
+    "normal",
+  );
+  // college is your "student" mode (college + school are same price in DB)
 
   const counts = React.useMemo(() => {
     const s = availability ?? [];
@@ -111,6 +229,39 @@ export default function BookingFlow({ initialData, games }: BookingFlowProps) {
     }
     return arr;
   }, [selection]);
+
+  const estimate = React.useMemo(() => {
+    const table = pricing ?? [];
+    let total = 0;
+    let missing = false;
+
+    for (const s of selectedConsoles) {
+      const row = table.find((p) => {
+        const userOk =
+          p.userType === userType ||
+          (userType === "college" && p.userType === "school");
+        return (
+          userOk &&
+          p.category === "session" &&
+          p.durationMinutes === Number(s.duration) &&
+          s.players >= p.minPlayers &&
+          s.players <= p.maxPlayers
+        );
+      });
+
+      if (!row) {
+        missing = true;
+        continue;
+      }
+
+      const line =
+        row.pricingType === "per_person" ? row.price * s.players : row.price;
+
+      total += line;
+    }
+
+    return { total, missing };
+  }, [pricing, selectedConsoles, userType]);
 
   const maxAllowedStep = React.useMemo(() => {
     // You can always use step 0.
@@ -195,17 +346,14 @@ export default function BookingFlow({ initialData, games }: BookingFlowProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
-  const slotCount = availability?.length ?? 0;
-  const availableCount =
-    availability?.filter((s) => s.availableConsoleIds.length > 0 && !s.isPast)
-      .length ?? 0;
-
   async function confirmBooking() {
     setBookingLoading(true);
     setBookingError(null);
 
     try {
       if (!slot) throw new Error("Pick a time slot first.");
+      if (estimate.missing)
+        throw new Error("Pricing not found for your selection.");
       if (selectedConsoles.length === 0)
         throw new Error("Pick at least 1 console.");
       if (name.trim().length < 2) throw new Error("Enter your name.");
@@ -218,6 +366,7 @@ export default function BookingFlow({ initialData, games }: BookingFlowProps) {
         selections: selectedConsoles,
         name: name.trim(),
         phone: phone.trim(),
+        userType,
       };
 
       const res = await fetch("/api/bookings", {
@@ -468,10 +617,74 @@ export default function BookingFlow({ initialData, games }: BookingFlowProps) {
                       }}
                     />
 
+                    <FormControl component="fieldset">
+                      <FormLabel
+                        component="legend"
+                        sx={{
+                          fontWeight: 900,
+                          fontSize: "0.875rem",
+                          mb: 1,
+                          color: "text.primary",
+                        }}
+                      >
+                        Pricing type
+                      </FormLabel>
+                      <RadioGroup
+                        row
+                        value={userType}
+                        onChange={(e) =>
+                          setUserType(e.target.value as "normal" | "college")
+                        }
+                      >
+                        <FormControlLabel
+                          value="normal"
+                          control={<Radio size="small" color="primary" />}
+                          label={
+                            <Typography variant="body2" fontWeight={800}>
+                              Normal
+                            </Typography>
+                          }
+                        />
+                        <FormControlLabel
+                          value="college"
+                          control={<Radio size="small" color="primary" />}
+                          label={
+                            <Typography variant="body2" fontWeight={800}>
+                              Student
+                            </Typography>
+                          }
+                        />
+                      </RadioGroup>
+                    </FormControl>
+
                     {bookingError && (
                       <Alert severity="error">{bookingError}</Alert>
                     )}
                   </Stack>
+
+                  {/* Mobile summary: show before confirm button */}
+                  <Box sx={{ display: { xs: "block", md: "none" } }}>
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        border: "1px solid rgba(0,0,0,0.08)",
+                        background: "rgba(0,0,0,0.02)",
+                      }}
+                    >
+                      <SummaryBlock
+                        date={date}
+                        slot={slot}
+                        selectedConsoles={selectedConsoles}
+                        estimateTotal={estimate.total}
+                        estimateMissing={estimate.missing}
+                        userTypeLabel={
+                          userType === "normal" ? "Normal" : "Student"
+                        }
+                      />
+                    </Paper>
+                  </Box>
 
                   <Divider />
 
@@ -487,7 +700,7 @@ export default function BookingFlow({ initialData, games }: BookingFlowProps) {
                     <Button
                       variant="contained"
                       onClick={confirmBooking}
-                      disabled={bookingLoading}
+                      disabled={bookingLoading || estimate.missing}
                       sx={{
                         borderRadius: 2,
                         px: 3,
@@ -504,7 +717,10 @@ export default function BookingFlow({ initialData, games }: BookingFlowProps) {
           </Grid>
 
           {/* Right: summary */}
-          <Grid size={{ xs: 12, md: 4 }}>
+          <Grid
+            size={{ xs: 12, md: 4 }}
+            sx={{ display: { xs: "none", md: "block" } }}
+          >
             <Paper
               elevation={0}
               sx={{
@@ -516,47 +732,14 @@ export default function BookingFlow({ initialData, games }: BookingFlowProps) {
                 background: "rgba(0,0,0,0.02)",
               }}
             >
-              <Stack spacing={2}>
-                <Typography fontWeight={900}>Your booking</Typography>
-
-                <Stack spacing={0.5}>
-                  <Typography variant="caption" color="text.secondary">
-                    Date
-                  </Typography>
-                  <Typography fontWeight={800}>{date}</Typography>
-                </Stack>
-
-                <Stack spacing={0.5}>
-                  <Typography variant="caption" color="text.secondary">
-                    Time
-                  </Typography>
-                  <Typography fontWeight={800}>
-                    {slot ? slot : "Not picked yet"}
-                  </Typography>
-                </Stack>
-
-                <Stack spacing={0.8}>
-                  <Typography variant="caption" color="text.secondary">
-                    Consoles
-                  </Typography>
-
-                  {selectedConsoles.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary">
-                      None selected
-                    </Typography>
-                  ) : (
-                    <Stack spacing={1}>
-                      {selectedConsoles.map((s) => (
-                        <Chip
-                          key={s.consoleId}
-                          label={`${CONSOLES.find((c) => c.id === s.consoleId)?.name ?? s.consoleId} • ${s.players}P • ${s.duration}m`}
-                          sx={{ borderRadius: 1, fontWeight: 800 }}
-                        />
-                      ))}
-                    </Stack>
-                  )}
-                </Stack>
-              </Stack>
+              <SummaryBlock
+                date={date}
+                slot={slot}
+                selectedConsoles={selectedConsoles}
+                estimateTotal={estimate.total}
+                estimateMissing={estimate.missing}
+                userTypeLabel={userType === "normal" ? "Normal" : "Student"}
+              />
             </Paper>
           </Grid>
         </Grid>

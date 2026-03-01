@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:gamepass": "npx tsx --env-file=.env.local scripts/syncGamePass.ts",
+    "seed:psplus": "npx tsx --env-file=.env.local scripts/syncPsPlus.ts",
+    "seed:pricing": "npx tsx --env-file=.env.local scripts/seedPricing.ts"
   },
   "dependencies": {
     "@emotion/cache": "^11.14.0",

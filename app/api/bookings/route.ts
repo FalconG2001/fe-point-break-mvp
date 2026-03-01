@@ -15,6 +15,47 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import mongoose from "mongoose";
 import { isAdminAllowed } from "@/lib/admin-actions";
+import Pricing from "@/models/pricing";
+
+async function computeTotalPrice(opts: {
+  userType: "normal" | "college" | "school";
+  selections: Array<{ players: number; duration: number }>;
+}) {
+  const { userType, selections } = opts;
+
+  const durations = Array.from(
+    new Set(selections.map((s) => Number(s.duration))),
+  );
+  const userTypes = userType === "college" ? ["college", "school"] : [userType];
+
+  const rows = await Pricing.find({
+    userType: { $in: userTypes },
+    category: "session",
+    durationMinutes: { $in: durations },
+  }).lean();
+
+  let total = 0;
+
+  for (const s of selections) {
+    const dur = Number(s.duration);
+    const players = Number(s.players);
+
+    const row = rows.find(
+      (r: any) =>
+        r.durationMinutes === dur &&
+        players >= r.minPlayers &&
+        players <= r.maxPlayers,
+    );
+
+    if (!row) {
+      throw new Error(`Pricing missing for ${dur}m and ${players} players`);
+    }
+
+    total += row.pricingType === "per_person" ? row.price * players : row.price;
+  }
+
+  return total;
+}
 
 export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
@@ -32,9 +73,16 @@ export async function POST(req: Request) {
 
   // ✅ ignore money fields for public users
   const payments = adminAllowed ? parsed.data.payments || [] : [];
-  const totalPrice = adminAllowed ? parsed.data.totalPrice || 0 : 0;
 
   const { date, slot, selections, name, phone } = parsed.data;
+  const clientUserType = parsed?.data?.userType || "normal";
+
+  // website users can only be normal or college
+  const userType = adminAllowed
+    ? clientUserType
+    : clientUserType === "college"
+      ? "college"
+      : "normal";
 
   const isAdmin = bookingFrom === "admin";
   if (!isAdmin && !isDateAllowed(date)) {
@@ -159,6 +207,16 @@ export async function POST(req: Request) {
     }
   }
 
+  const computedTotal = await computeTotalPrice({
+    userType,
+    selections,
+  });
+
+  // admins may override, website cannot
+  const finalTotalPrice = adminAllowed
+    ? (parsed.data.totalPrice ?? computedTotal)
+    : computedTotal;
+
   try {
     const booking = new Booking({
       date,
@@ -168,7 +226,7 @@ export async function POST(req: Request) {
       confirmed: true,
       bookingFrom,
       payments: payments || [],
-      totalPrice: totalPrice || 0,
+      totalPrice: finalTotalPrice,
     });
 
     const res = await booking.save();
@@ -182,7 +240,7 @@ export async function POST(req: Request) {
       customerName: name,
       customerPhone: phone || "",
       bookingFrom,
-      totalPrice,
+      totalPrice: finalTotalPrice,
     }).catch(() => {});
 
     return NextResponse.json({ ok: true, id: String(res._id) });
