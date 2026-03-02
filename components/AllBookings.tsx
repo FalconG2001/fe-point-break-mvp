@@ -423,6 +423,21 @@ export default function AllBookings({
                             ) || 0}{" "}
                             / ₹{b.totalPrice || 0}
                           </Typography>
+                          {b?.payments && b?.payments?.length > 0 && (
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ fontSize: "0.6rem" }}
+                            >
+                              {b?.payments
+                                ?.map((p) =>
+                                  p?.type === 1
+                                    ? `G:${p?.amount}`
+                                    : `C:${p?.amount}`,
+                                )
+                                ?.join(", ")}
+                            </Typography>
+                          )}
                         </Stack>
                       </TableCell>
                       <TableCell align="right">
