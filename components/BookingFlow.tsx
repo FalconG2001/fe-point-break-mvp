@@ -21,11 +21,17 @@ import RadioGroup from "@mui/material/RadioGroup";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import FormControl from "@mui/material/FormControl";
 import FormLabel from "@mui/material/FormLabel";
+import Accordion from "@mui/material/Accordion";
+import AccordionSummary from "@mui/material/AccordionSummary";
+import AccordionDetails from "@mui/material/AccordionDetails";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import Link from "next/link";
 
 import DateTabs from "./DateTabs";
 import TimeSlotPicker from "./TimeSlotPicker";
 import ConsoleSelector, { type SelectionState } from "./ConsoleSelector";
 import GamesShowcase from "./GamesShowcase";
+import PricingNotes from "./PricingNotes";
 
 import {
   todayYmd,
@@ -98,6 +104,23 @@ function SummaryBlock({
           Pricing
         </Typography>
         <Typography fontWeight={800}>{userTypeLabel}</Typography>
+        <Link
+          href="/pricing"
+          style={{ textDecoration: "none" }}
+          target="_blank"
+        >
+          <Typography
+            variant="caption"
+            color="primary"
+            sx={{
+              fontWeight: 700,
+              cursor: "pointer",
+              "&:hover": { textDecoration: "underline" },
+            }}
+          >
+            View pricing plans
+          </Typography>
+        </Link>
         {userTypeLabel === "Student" && (
           <Typography variant="caption" color="error" fontWeight={700}>
             Note: You must show a school or college ID
@@ -682,6 +705,34 @@ export default function BookingFlow({
                         }
                       />
                     </Paper>
+                  </Box>
+                  <Box>
+                    <Accordion
+                      elevation={0}
+                      sx={{
+                        background: "rgba(251, 191, 36, 0.05)",
+                        border: "1px solid rgba(251, 191, 36, 0.2)",
+                        borderRadius: "8px !important",
+                        "&:before": { display: "none" },
+                      }}
+                    >
+                      <AccordionSummary
+                        expandIcon={
+                          <ExpandMoreIcon sx={{ color: "#d97706" }} />
+                        }
+                      >
+                        <Typography
+                          variant="body2"
+                          fontWeight={800}
+                          sx={{ color: "#d97706" }}
+                        >
+                          Important Notes & Conditions
+                        </Typography>
+                      </AccordionSummary>
+                      <AccordionDetails sx={{ pt: 0 }}>
+                        <PricingNotes variant="list-only" />
+                      </AccordionDetails>
+                    </Accordion>
                   </Box>
 
                   <Divider />
