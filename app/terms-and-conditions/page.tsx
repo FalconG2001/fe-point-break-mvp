@@ -99,10 +99,10 @@ export default function TermsPage() {
                 the booking time. No-shows or very late arrivals may lose the
                 booking.
               </P>
-              <P sx={{ mt: 1 }}>
+              {/* <P sx={{ mt: 1 }}>
                 If you want a strict policy, replace this section with your
                 exact rules (example: “No cancellation within 1 hour”).
-              </P>
+              </P> */}
             </Section>
 
             <Section title="7) Rules at the gaming center">
